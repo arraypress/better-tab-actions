@@ -1,0 +1,9 @@
+{
+  "manifest_version": 3,
+  "name": "Tab menu separator repro",
+  "version": "1.0",
+  "description": "Minimal repro: separators in a tab-context submenu are not shown.",
+  "minimum_chrome_version": "150",
+  "permissions": ["contextMenus"],
+  "background": { "service_worker": "background.js" }
+}

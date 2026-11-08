@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>More Tab Actions settings</title>
+  <link rel="icon" href="icons/icon-32.png">
+  <link rel="stylesheet" href="chrome-ui.css">
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <header class="toolbar">
+    <div class="toolbar-start">
+      <img src="icons/icon-48.png" alt="" width="24" height="24">
+      <h1>More Tab Actions</h1>
+    </div>
+    <div class="toolbar-center"></div>
+    <div class="toolbar-end">
+      <span id="status" class="status secondary" role="status" aria-live="polite"></span>
+    </div>
+  </header>
+
+  <main class="page">
+    <h2 class="section-title" id="h-menu">Menu</h2>
+    <section class="card" aria-labelledby="h-menu">
+      <p class="row text"><span class="label">Choose what appears under <strong>More tab actions</strong> when you right-click a tab. Hidden actions still work from keyboard shortcuts.</span></p>
+      <div id="menu-items" class="menu-items"></div>
+    </section>
+
+    <h2 class="section-title" id="h-closing">Closing tabs</h2>
+    <section class="card" aria-labelledby="h-closing">
+      <div class="row two-line">
+        <label class="label" for="windowScope">
+          <span>Windows</span>
+          <span class="secondary">Where site, duplicate and inactive tabs are closed</span>
+        </label>
+        <select id="windowScope">
+          <option value="window">This window only</option>
+          <option value="all">All windows</option>
+        </select>
+      </div>
+      <div class="row two-line">
+        <label class="label" for="inactiveDays">
+          <span>Inactive after</span>
+          <span class="secondary">Used by “Close tabs not used in …”</span>
+        </label>
+        <span class="days"><input id="inactiveDays" type="number" min="1" max="365" step="1" inputmode="numeric"> days</span>
+      </div>
+      <label class="row two-line">
+        <span class="label">
+          <span>Include tabs in groups</span>
+          <span class="secondary">Turn off to leave grouped tabs alone. Pinned tabs are never closed.</span>
+        </span>
+        <input id="includeGroupedTabs" type="checkbox" class="switch" role="switch">
+      </label>
+    </section>
+
+    <h2 class="section-title" id="h-shortcuts">Keyboard shortcuts</h2>
+    <section class="card" aria-labelledby="h-shortcuts">
+      <div id="shortcuts"></div>
+      <button id="edit-shortcuts" type="button" class="link-row external">
+        <span class="label">
+          <span>Keyboard shortcuts</span>
+          <span id="no-shortcuts" class="secondary" hidden>None set yet. Add them on Chrome’s Keyboard shortcuts page.</span>
+        </span>
+      </button>
+    </section>
+
+    <!-- Copies chrome://settings/help ("About Chrome"); links come from about-links.js. -->
+    <h2 class="section-title" id="h-about">About More Tab Actions</h2>
+    <section class="card" aria-labelledby="h-about">
+      <div class="row two-line about-product">
+        <img src="icons/icon-128.png" width="32" height="32" alt="">
+        <span class="label product-title">More Tab Actions</span>
+      </div>
+      <div class="row">
+        <span class="label"><span id="version" class="secondary"></span></span>
+      </div>
+      <a id="help" class="link-row external" target="_blank" rel="noopener">
+        <span class="label">Get help with More Tab Actions</span>
+      </a>
+      <a id="report-issue" class="link-row external">
+        <span class="label">Report an issue</span>
+      </a>
+      <a id="privacy-policy" class="link-row external" target="_blank" rel="noopener">
+        <span class="label">Privacy policy</span>
+      </a>
+    </section>
+  </main>
+  <script type="module" src="options.js"></script>
+</body>
+</html>

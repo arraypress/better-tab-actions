@@ -1,0 +1,22 @@
+{
+  "name": "more-tab-actions",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "e2e": "node e2e/groups.mjs && node e2e/options.mjs && node e2e/toolbar.mjs",
+    "toolbar-icons": "node scripts/toolbar-icons.mjs",
+    "check-ui": "node scripts/check-ui.mjs",
+    "package": "npm test && npm run check-ui && rm -rf release && mkdir release && zip -r -X release/more-tab-actions.zip manifest.json background.js actions.js settings.js migrate.js about-links.js sites.js undo.js recent.js shortcuts.js options.html chrome-ui.css options.css options.js toolbar-scheme.js toolbar-theme.js offscreen.html offscreen.js icons -x 'icons/toolbar/*.svg' && node scripts/warn-placeholder-links.mjs"
+  },
+  "description": "Adds more actions to Chrome’s tab right-click menu.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/arraypress/more-tab-actions.git"
+  },
+  "devDependencies": {
+    "playwright": "1.64.0"
+  }
+}

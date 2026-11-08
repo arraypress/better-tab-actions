@@ -1,0 +1,55 @@
+{
+  "manifest_version": 3,
+  "name": "More Tab Actions",
+  "version": "1.0.0",
+  "description": "More actions for Chrome’s tab right-click menu: close tabs by site, duplicates, inactive tabs, mute tabs, save windows as groups.",
+  "minimum_chrome_version": "150",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_title": "More Tab Actions settings",
+    "default_icon": {
+      "16": "icons/toolbar/light-16.png",
+      "32": "icons/toolbar/light-32.png",
+      "48": "icons/toolbar/light-48.png"
+    }
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "permissions": ["contextMenus", "tabs", "tabGroups", "storage", "offscreen"],
+  "commands": {
+    "switch-last-tab": {
+      "suggested_key": {
+        "default": "Alt+Shift+Z",
+        "mac": "Alt+Shift+Z"
+      },
+      "description": "Switch to last used tab"
+    },
+    "close-site-tabs": {
+      "suggested_key": {
+        "default": "Alt+Shift+W",
+        "mac": "Alt+Shift+W"
+      },
+      "description": "Close tabs from this site"
+    },
+    "close-other-site-tabs": { "description": "Close other tabs from this site" },
+    "close-duplicate-tabs": { "description": "Close duplicate tabs" },
+    "close-inactive-tabs": { "description": "Close inactive tabs" },
+    "close-tabs-to-left": { "description": "Close tabs to the left" },
+    "reopen-closed-tabs": { "description": "Reopen closed tabs" },
+    "sort-tabs-by-site": { "description": "Sort tabs by site" },
+    "mute-other-tabs": { "description": "Mute or unmute other tabs" },
+    "save-window-as-group": { "description": "Save this window as a group" },
+    "close-window-keep-group": { "description": "Close window and keep as group" }
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  }
+}

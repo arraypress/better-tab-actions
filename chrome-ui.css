@@ -1,0 +1,1086 @@
+/*
+ * chrome-ui.css — the look of Chrome's own pages (chrome://settings,
+ * chrome://bookmarks) for ArrayPress's extension pages.
+ *
+ * THE KIT IS THE SOURCE: edit Extensions/_chrome-ui/chrome-ui.css, then run
+ * `node Extensions/_chrome-ui/sync.mjs`. Each extension ships a copy (an
+ * extension can't load files from outside its package) and its build or
+ * package step fails while the copy differs from the kit.
+ *
+ * Values come from Chromium's source (chromium/src, main, Nov 2026) and were
+ * checked against computed styles of chrome://settings and chrome://bookmarks
+ * in Chromium 156 and Chrome 157 (light and dark):
+ *
+ *   ui/webui/resources/cr_elements/cr_shared_vars.css
+ *     --cr-section-min-height 48px, --cr-section-two-line-min-height 64px,
+ *     --cr-section-padding 20px, --cr-section-vertical-padding 12px,
+ *     --cr-centered-card-max-width 680px (width 96%),
+ *     --cr-separator-line 1px solid rgba(0,0,0,.06) / dark rgba(255,255,255,.1),
+ *     --cr-card-border-radius 8px, --cr-card-background-color white /
+ *     dark #292a2d, --cr-card-shadow = --cr-elevation-2, page background
+ *     white / dark #202124, --cr-button-height 36px, --cr-icon-size 20px,
+ *     --cr-toolbar-height 56px, and the GM3 fallback colours
+ *     (--cr-fallback-color-*) used for every token below.
+ *   ui/webui/resources/cr_elements/cr_shared_style_lit.css
+ *     .cr-row (border-top separator, 48px, 0 20px), .cr-secondary-text,
+ *     .cr-centered-card-container, .cr-form-field-label (11px/16px 500).
+ *   chrome/browser/resources/settings/settings_shared_lit.css
+ *     .settings-box, .two-line (64px), .settings-box.first (no separator).
+ *   chrome/browser/resources/settings/settings_page/settings_section.css
+ *     section title: 108% (14px) weight 400, letter-spacing .25px,
+ *     margin 21px 0 12px, padding 8px 0 4px; card radius/shadow/background.
+ *   ui/webui/resources/cr_elements/cr_toggle/cr_toggle.css
+ *     bar 26x16 with a 1px border, knob 8px off / 12px on; on = primary
+ *     track + on-primary knob; off = surface-variant track, outline knob.
+ *   ui/webui/resources/cr_elements/md_select_lit.css
+ *     200x36, radius 8, 1px neutral-outline border, 12px text, 7px arrow
+ *     10px from the end.
+ *   ui/webui/resources/cr_elements/cr_input/cr_input_style_lit.css
+ *     filled field: surface-variant, radius 8 8 0 0, 1px outline underline
+ *     (2px primary when focused), 10px padding, 12px/16px text.
+ *   ui/webui/resources/cr_elements/cr_button/cr_button.css
+ *     36px pill, 8px 16px, 13px/500, tonal-outline border; .action-button
+ *     filled primary.
+ *   ui/webui/resources/cr_elements/cr_icon_button/cr_icon_button.css (32px).
+ *   ui/webui/resources/cr_elements/cr_link_row/cr_link_row.css
+ *     48px, 0 20px, label 12px vertical padding, 20px end icon.
+ *   ui/webui/resources/cr_elements/cr_action_menu/cr_action_menu.css
+ *     radius 4, elevation-2, items min 32px padding 8px 24px.
+ *   ui/webui/resources/cr_elements/cr_dialog/cr_dialog.css
+ *     512px, radius 8, title 15px (20px 20px 16px), body secondary text,
+ *     buttons 16px, backdrop rgba(0,0,0,.6).
+ *   ui/webui/resources/cr_elements/cr_toast/cr_toast.css
+ *     inverse surface, radius 8, min-height 52px, 288–568px, 24px margin.
+ *   ui/webui/resources/cr_elements/cr_drawer/cr_drawer.css (256px).
+ *   ui/webui/resources/cr_elements/cr_toolbar/cr_toolbar.css,
+ *   cr_toolbar_search_field: 56px bar, 22px/500 title, 36px pill search.
+ *   chrome/browser/resources/settings/settings_menu (cr-nav-menu-item):
+ *     40px items, padding 10px 16px 10px 23px, radius 0 100px 100px 0,
+ *     14px/500, 20px icon + 20px gap; selected google-blue-50 / blue-700,
+ *     dark google-blue-300 / grey-900.
+ *   chrome/browser/resources/bookmarks/{item,list,shared_vars,app}.css
+ *     40px rows, list card max 960px, sidebar 256px.
+ *   Side panels (checked against chrome://read-later.top-chrome, the Reading
+ *   list panel, in Chromium 156, light and dark):
+ *   chrome/browser/resources/side_panel/shared/sp_shared_vars.css,
+ *   sp_shared_style.css, sp_heading.css, sp_empty_state.css, sp_footer.css
+ *     8px body padding, card radius 12 / 8px 0 padding / 12px gap, 36px
+ *     headings 14px/500, empty state 16px/500 heading + 13px body, 56px
+ *     footer; colours from chrome/browser/ui/color/material_side_panel_color_mixer.cc
+ *     (panel = sys base-container, card = base-container-elevated).
+ *   ui/webui/resources/cr_elements/cr_url_list_item/cr_url_list_item.css
+ *     48px rows, 4px 16px, 40px icon box radius 8, title 12px/500,
+ *     description 11px, suffix buttons 24px shown on hover/focus.
+ *   ui/webui/resources/cr_elements/cr_button/cr_button.css .floating-button
+ *     tonal, radius 8, 40px, 8px 16px 8px 12px with a 20px icon.
+ *   ui/webui/resources/cr_elements/cr_tabs/cr_tabs.css
+ *     48px, 14px/500, secondary text, selected primary with a 2px bar.
+ *
+ * Not used: the "settings-refresh-2026" experiment (16px cards without
+ * separators); it isn't on in Chrome 157 by default. Re-measure if it ships.
+ */
+
+:root {
+    color-scheme: light dark;
+
+    /* Colours (Chrome's --cr-fallback-color-* and --cr-* values). */
+    --page-bg: #ffffff;
+    --surface: #ffffff;                    /* --cr-card-background-color */
+    --card: var(--surface);
+    --text: rgb(31 31 31);                 /* --cr-primary-text-color */
+    --text-secondary: rgb(68 71 70);       /* --cr-secondary-text-color */
+    --text-subtle: rgb(71 71 71);          /* on-surface-subtle: field labels */
+    --primary: rgb(11 87 208);             /* links, focus ring, toggle on */
+    --on-primary: #ffffff;
+    --separator: rgb(0 0 0 / 0.06);        /* --cr-separator-color */
+    --hover: rgb(31 31 31 / 0.08);         /* --cr-hover-background-color */
+    --hover-subtle: rgb(31 31 31 / 0.06);
+    --active: rgb(31 31 31 / 0.12);
+    --button-border: rgb(168 199 250);     /* tonal-outline */
+    --field-border: rgb(199 199 199);      /* neutral-outline */
+    --field-bg: rgb(225 227 225);          /* surface-variant (cr-input) */
+    --outline: rgb(116 119 117);
+    --switch-track-off: rgb(225 227 225);
+    --switch-outline-off: rgb(116 119 117);
+    --error: rgb(179 38 30);
+    --icon: rgb(68 71 70);
+    --icon-muted: rgb(95 99 104);          /* google-grey-700: menu and link-row icons */
+    --selected-bg: rgb(232 240 254);       /* google-blue-50 */
+    --selected-text: rgb(25 103 210);      /* google-blue-700 */
+    --folder-text: rgb(90 90 90);          /* --cr-title-text-color: bookmarks folders */
+    --chip-bg: color-mix(in srgb, var(--primary) 10%, transparent);
+    --search-bg: rgb(236 239 247);         /* base-container */
+    --menu-bg: #ffffff;
+    --dialog-bg: #ffffff;
+    --toast-bg: rgb(48 48 48);             /* inverse-surface */
+    --toast-text: rgb(242 242 242);
+    --toast-action: rgb(168 199 250);      /* inverse-primary */
+    --warning-bg: rgb(254 247 224);
+    --warning-text: rgb(31 31 31);
+    --warning-icon: rgb(176 96 0);
+    --card-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.3), 0 2px 6px 2px rgb(0 0 0 / 0.15);
+    --menu-shadow: var(--card-shadow);
+    --dialog-shadow: 0 0 16px rgb(0 0 0 / 0.12), 0 16px 16px rgb(0 0 0 / 0.24);
+    --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='12' fill='%235F6368'%3E%3Cpath d='M0 0h24L12 12z'/%3E%3C/svg%3E");
+
+    /* Side panels (the Reading list panel's colours). */
+    --sp-bg: rgb(237 242 250);             /* sys base-container */
+    --sp-card: #ffffff;                    /* base-container-elevated */
+    --sp-text: rgb(31 31 31);
+    --sp-text-secondary: rgb(71 71 71);    /* on-surface-subtle */
+    --sp-icon-bg: rgb(242 242 242);        /* list-item-url-favicon-background */
+    --sp-search-bg: #ffffff;
+    --sp-divider: rgb(211 227 253);
+    --sp-scrollbar: rgb(168 199 250);      /* tonal-outline */
+    --tonal-bg: rgb(211 227 253);          /* button-background-tonal */
+    --tonal-text: rgb(4 30 73);
+    --elevation-3: 0 1px 3px 0 rgb(60 64 67 / 0.3), 0 4px 8px 3px rgb(60 64 67 / 0.15);
+
+    /* Icons for link rows (cr:open-in-new, cr:arrow-right / subpage arrow). */
+    --icon-open-in-new: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z'/%3E%3C/svg%3E");
+    --icon-arrow-right: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z'/%3E%3C/svg%3E");
+
+    /* Sizes. */
+    --radius: 8px;                         /* cards, fields, dialogs */
+    --row-min-height: 48px;
+    --row-two-line-min-height: 64px;
+    --row-padding: 0 20px;
+    --row-vertical-padding: 12px;
+    --button-height: 36px;
+    --page-width: 680px;
+    --toolbar-height: 56px;
+    --sidebar-width: 256px;
+    --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+    font: 13px/1.54 system-ui, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --page-bg: rgb(32 33 36);          /* google-grey-900 */
+        --surface: rgb(41 42 45);          /* #292a2d */
+        --text: rgb(227 227 227);
+        --text-secondary: rgb(196 199 197);
+        --text-subtle: rgb(199 199 199);
+        --primary: rgb(168 199 250);
+        --on-primary: rgb(6 46 111);
+        --separator: rgb(255 255 255 / 0.1);
+        --hover: rgb(227 227 227 / 0.08);
+        --hover-subtle: rgb(253 252 251 / 0.1);
+        --active: rgb(227 227 227 / 0.12);
+        --button-border: rgb(4 125 183);
+        --field-border: rgb(117 117 117);
+        --field-bg: rgb(68 71 70);
+        --outline: rgb(142 145 143);
+        --switch-track-off: rgb(68 71 70);
+        --switch-outline-off: rgb(142 145 143);
+        --error: rgb(242 184 181);
+        --icon: rgb(196 199 197);
+        --icon-muted: rgb(154 160 166);    /* google-grey-500 */
+        --selected-bg: rgb(138 180 248);   /* google-blue-300 */
+        --selected-text: rgb(32 33 36);
+        --folder-text: rgb(154 160 166);
+        --search-bg: rgb(0 0 0 / 0.22);
+        --menu-bg: rgb(41 42 45);
+        --dialog-bg: rgb(41 42 45);        /* grey-900 + 4% white */
+        --toast-bg: rgb(227 227 227);
+        --toast-text: rgb(31 31 31);
+        --toast-action: rgb(11 87 208);
+        --warning-bg: rgb(66 55 28);
+        --warning-text: rgb(240 230 205);
+        --warning-icon: rgb(253 214 99);
+        --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='12' fill='%239aa0a6'%3E%3Cpath d='M0 0h24L12 12z'/%3E%3C/svg%3E");
+        --sp-bg: rgb(40 40 40);
+        --sp-card: rgb(60 60 60);
+        --sp-text: rgb(227 227 227);
+        --sp-text-secondary: rgb(199 199 199);
+        --sp-icon-bg: rgb(40 40 40);
+        --sp-search-bg: rgb(60 60 60);
+        --sp-divider: rgb(94 94 94);
+        --sp-scrollbar: rgb(4 125 183);
+        --tonal-bg: rgb(0 74 119);
+        --tonal-text: rgb(194 231 255);
+        --elevation-3: 0 1px 3px 0 rgb(0 0 0 / 0.3), 0 4px 8px 3px rgb(0 0 0 / 0.15);
+    }
+}
+
+/* ------------------------------------------------------------------ Base */
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    /* Chrome's stylesheet for extension pages sets body to 75%; its own pages use 13px. */
+    font-size: 13px;
+    background: var(--page-bg);
+    color: var(--text);
+}
+
+h1, h2, h3, p { margin: 0; }
+
+[hidden] { display: none !important; }
+
+.secondary { color: var(--text-secondary); font-weight: 400; }
+.error { color: var(--error); }
+.mono { font-family: var(--mono); }
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+a { color: var(--primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+/* --------------------------------------------------------------- Buttons */
+
+/* cr-button: outlined pill; .action is the filled action-button. */
+button {
+    font: 500 13px/20px system-ui, sans-serif;
+    height: var(--button-height);
+    padding: 0 16px;
+    border: 1px solid var(--button-border);
+    border-radius: 100px;
+    background: transparent;
+    color: var(--primary);
+    cursor: pointer;
+    flex: none;
+    white-space: nowrap;
+}
+
+button:hover { background: var(--hover-subtle); }
+button:active { background: var(--active); }
+
+button.action {
+    background: var(--primary);
+    border-color: transparent;
+    color: var(--on-primary);
+}
+
+button.action:hover { background: color-mix(in srgb, var(--primary), var(--on-primary) 8%); }
+
+button:disabled { opacity: 0.38; cursor: default; pointer-events: none; }
+
+/* A button that reads as a link (action-link). */
+button.link {
+    height: auto;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    font-weight: 400;
+    color: var(--primary);
+}
+
+button.link:hover { background: none; text-decoration: underline; }
+
+/* cr-icon-button: a 32px circle holding a 20px icon. */
+.icon-button {
+    display: inline-grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    color: var(--icon);
+}
+
+.icon-button:hover { background: var(--hover); }
+
+.icon { width: 20px; height: 20px; fill: currentColor; flex: none; }
+
+.sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+/* --------------------------------------------------------------- Fields */
+
+/* md-select. */
+select {
+    appearance: none;
+    font: 12px system-ui, sans-serif;
+    color: var(--text);
+    width: 200px;
+    max-width: 100%;
+    height: 36px;
+    padding: 0 20px 0 10px;
+    border: 1px solid var(--field-border);
+    border-radius: var(--radius);
+    background: var(--select-arrow) calc(100% - 10px) center / 7px no-repeat transparent;
+    cursor: pointer;
+}
+
+select:hover { background-color: var(--hover-subtle); }
+select:focus-visible { outline: 2px solid var(--primary); outline-offset: -1px; }
+select:disabled { opacity: 0.38; cursor: default; }
+select option, select optgroup { background: var(--surface); color: var(--text); }
+
+/* cr-input: filled, rounded top, an underline that turns primary on focus. */
+input:is([type="text"], [type="number"], [type="search"], [type="url"], [type="email"], [type="tel"], [type="date"], [type="time"], [type="datetime-local"]),
+textarea {
+    font: 12px/16px system-ui, sans-serif;
+    color: var(--text);
+    min-height: 36px;
+    padding: 10px;
+    border: 0;
+    border-bottom: 1px solid var(--outline);
+    border-radius: 8px 8px 0 0;
+    background: var(--field-bg);
+    outline: none;
+}
+
+textarea { font-size: 13px; line-height: 20px; resize: vertical; }
+
+input:is([type="text"], [type="number"], [type="search"], [type="url"], [type="email"], [type="tel"], [type="date"], [type="time"], [type="datetime-local"]):hover,
+textarea:hover { background: linear-gradient(var(--hover), var(--hover)) var(--field-bg); }
+
+input:is([type="text"], [type="number"], [type="search"], [type="url"], [type="email"], [type="tel"], [type="date"], [type="time"], [type="datetime-local"]):focus,
+textarea:focus {
+    border-bottom-color: var(--primary);
+    box-shadow: inset 0 -1px 0 var(--primary);
+    outline: none;
+}
+
+input::placeholder, textarea::placeholder { color: var(--text-subtle); opacity: 1; }
+input[type="search"]::-webkit-search-cancel-button { display: none; }
+input:disabled, textarea:disabled { opacity: 0.38; }
+
+[aria-invalid="true"] { border-bottom-color: var(--error) !important; box-shadow: inset 0 -1px 0 var(--error) !important; }
+
+/* .cr-form-field-label, above a field. */
+.field-label,
+.field > label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--text-subtle);
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 16px;
+    letter-spacing: 0.4px;
+}
+
+.field { display: grid; }
+.field > input, .field > textarea, .field > select { width: 100%; }
+.field > .hint { margin-top: 4px; }
+.hint { color: var(--text-secondary); font-size: 12px; }
+
+/* cr-checkbox and cr-radio-button. */
+input[type="checkbox"]:not(.switch),
+input[type="radio"] {
+    accent-color: var(--primary);
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    flex: none;
+    cursor: pointer;
+}
+
+/* cr-toggle, on a checkbox: <input type="checkbox" class="switch" role="switch">. */
+input.switch {
+    appearance: none;
+    flex: none;
+    position: relative;
+    width: 26px;
+    height: 16px;
+    margin: 0;
+    border: 1px solid var(--switch-outline-off);
+    border-radius: 50px;
+    background: var(--switch-track-off);
+    cursor: pointer;
+    transition: background-color 80ms linear, border-color 80ms linear;
+}
+
+input.switch::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 7px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--switch-outline-off);
+    transform: translate(-50%, -50%);
+    transition: left 80ms linear, width 80ms linear, height 80ms linear, background-color 80ms linear;
+}
+
+/* The 20px hover halo around the knob. */
+input.switch:hover::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 7px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--hover-subtle);
+    transform: translate(-50%, -50%);
+}
+
+input.switch:active::after { width: 10px; height: 10px; }
+input.switch:checked { background: var(--primary); border-color: var(--primary); }
+input.switch:checked::after { left: 17px; width: 12px; height: 12px; background: var(--on-primary); }
+input.switch:checked:hover::before { left: 17px; }
+input.switch:checked:active::after { width: 14px; height: 14px; }
+input.switch:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+input.switch:disabled { opacity: 0.38; cursor: default; }
+input.switch:disabled::before { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+    input.switch, input.switch::after { transition: none; }
+}
+
+/* ------------------------------------------------------------ Toolbar */
+
+/* cr-toolbar: 56px; the title, a centred pill search, actions at the end. */
+.toolbar {
+    flex: none;
+    display: grid;
+    grid-template-columns: var(--sidebar-width) minmax(0, 1fr) var(--sidebar-width);
+    align-items: center;
+    height: var(--toolbar-height);
+    padding-right: 12px;
+}
+
+.toolbar-start { display: flex; align-items: center; gap: 12px; padding-left: 20px; min-width: 0; }
+.toolbar-start h1, .toolbar > h1 {
+    font-size: 22px;
+    font-weight: 500;
+    letter-spacing: 0.25px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.toolbar-center { display: flex; justify-content: center; min-width: 0; }
+.toolbar-end { display: flex; justify-content: flex-end; align-items: center; gap: 4px; }
+
+/* cr-toolbar-search-field. */
+.search-field {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    max-width: 680px;
+    height: 36px;
+    padding: 0 6px 0 10px;
+    border-radius: 100px;
+    background: var(--search-bg);
+    color: var(--icon);
+}
+
+.search-field:focus-within { outline: 2px solid var(--primary); outline-offset: 0; }
+
+.search-field input,
+.search-field input:hover,
+.search-field input:focus {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    min-height: 0;
+    padding: 0 0 0 4px;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    color: var(--text);
+    font: 500 12px system-ui, sans-serif;
+}
+
+.search-field input::placeholder { color: var(--text-secondary); }
+
+/* --------------------------------------------- Settings page (chrome://settings) */
+
+/* The centred column: 680px, 96% of narrower windows. */
+.page {
+    width: 96%;
+    max-width: var(--page-width);
+    margin: 0 auto;
+    padding-bottom: 48px;
+}
+
+/* settings-section's title, above its card. */
+.section-title {
+    display: block;
+    margin: 21px 0 12px;
+    padding: 8px 0 4px;
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 20px;
+    letter-spacing: 0.25px;
+}
+
+/* A sub-heading inside a card (settings' h2). */
+.card-heading {
+    display: flex;
+    align-items: center;
+    min-height: var(--row-min-height);
+    padding: var(--row-padding);
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.card {
+    background: var(--card);
+    border-radius: var(--radius);
+    box-shadow: var(--card-shadow);
+    overflow: hidden;
+}
+
+/* .settings-box / .cr-row: one setting per row, separators between rows only. */
+.row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: var(--row-min-height);
+    margin: 0;
+    padding: var(--row-padding);
+    border-top: 1px solid var(--separator);
+}
+
+/* No separator above a card's first row (also when rows sit in a wrapper);
+   .first / .continuation mark it by hand, as Chrome does. */
+.card > :is(.row, .link-row):first-child,
+.card > :first-child > :is(.row, .link-row):first-child,
+.card > [hidden]:first-child + :is(.row, .link-row),
+.row.first,
+.row.continuation,
+.link-row.first { border-top: 0; }
+
+.row.two-line { min-height: var(--row-two-line-min-height); }
+
+/* The text side of a row: a label, and secondary text below it. */
+.row .label {
+    flex: 1;
+    min-width: 0;
+    padding: var(--row-vertical-padding) 0;
+}
+
+.row .label > .secondary,
+.row .label > .error { display: block; }
+
+/* A row whose label is a whole paragraph of help. */
+.row.text { color: var(--text-secondary); }
+
+/* A value shown at the end of a row (a shortcut, a status). */
+.row-value { color: var(--text-secondary); white-space: nowrap; }
+
+label.row, .row[actionable] { cursor: pointer; }
+
+/* cr-link-row: a whole row that opens something, with an arrow or ↗ at the end. */
+.link-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+    height: auto;
+    min-height: var(--row-min-height);
+    margin: 0;
+    padding: var(--row-padding);
+    border: 0;
+    border-top: 1px solid var(--separator);
+    border-radius: 0;
+    background: none;
+    color: var(--text);
+    font: inherit;
+    text-align: start;
+    text-decoration: none;
+    white-space: normal;
+    cursor: pointer;
+}
+
+.link-row:hover { background: var(--hover-subtle); text-decoration: none; }
+.link-row:active { background: var(--active); }
+.link-row:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.link-row .label { flex: 1; min-width: 0; padding: var(--row-vertical-padding) 0; }
+.link-row .label > .secondary { display: block; }
+
+.link-row::after {
+    content: "";
+    flex: none;
+    width: 20px;
+    height: 20px;
+    margin-right: -2px;
+    background: var(--icon-muted);
+    mask: var(--icon-arrow-right) center / 20px no-repeat;
+}
+
+.link-row.external::after { mask-image: var(--icon-open-in-new); }
+
+/* A list inside a card: each item is a row. */
+.list { list-style: none; margin: 0; padding: 0; }
+.list:empty { display: none; }
+
+/* -------------------------------- Settings menu (settings-menu, cr-nav-menu-item) */
+
+.nav { padding: 8px 0 5px; }
+.nav-list { list-style: none; margin: 0; padding: 0; }
+
+.nav-item {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    min-height: 40px;
+    margin: 0 2px 0 1px;
+    padding: 10px 16px 10px 23px;
+    border-radius: 0 100px 100px 0;
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 14px;
+    text-decoration: none;
+    cursor: pointer;
+    user-select: none;
+}
+
+.nav-item:hover { background: var(--hover); text-decoration: none; }
+.nav-item:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.nav-item .icon { color: var(--icon-muted); }
+.nav-item[aria-current="page"], .nav-item.selected { background: var(--selected-bg); color: var(--selected-text); }
+.nav-item[aria-current="page"] .icon, .nav-item.selected .icon { color: inherit; }
+.nav-separator { margin: 8px 0; border: 0; border-top: 1px solid var(--separator); }
+
+/* ------------------------------------- Bookmarks-style manager (chrome://bookmarks) */
+
+/* The page behind a manager: toolbar on top, a 256px sidebar, the list. */
+.manager { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+.layout { flex: 1; min-height: 0; display: grid; grid-template-columns: var(--sidebar-width) minmax(0, 1fr); }
+.sidebar { overflow: auto; padding: 8px 0 24px; }
+.main { overflow: auto; padding: 24px 32px 96px 17px; min-width: 0; }
+
+/* A folder in the sidebar (bookmarks-folder-node): the same pill as the settings menu. */
+.tree { list-style: none; margin: 0; padding: 0; }
+
+.tree-item {
+    --depth: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    margin: 0 3px 0 1px;
+    padding: 0 4px 0 calc(8px + var(--depth) * 20px);
+    border-radius: 0 100px 100px 0;
+    color: var(--folder-text);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    user-select: none;
+    outline-offset: -2px;
+    text-decoration: none;
+}
+
+.tree-item:hover { background: var(--hover); text-decoration: none; }
+.tree-item .icon { color: var(--icon-muted); }
+.tree-item[aria-selected="true"], .tree-item[aria-current="true"], .tree-item[aria-current="page"] {
+    background: var(--selected-bg);
+    color: var(--selected-text);
+}
+.tree-item:is([aria-selected="true"], [aria-current="true"], [aria-current="page"]) .icon { color: inherit; }
+
+/* The list card (bookmarks-list #list.card): 40px rows, no separators. */
+.list-card {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 8px 0;
+    border-radius: var(--radius);
+    background: var(--card);
+    box-shadow: var(--card-shadow);
+}
+
+.item {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    height: 40px;
+    padding: 0 8px 0 20px;
+    user-select: none;
+}
+
+.item:hover { background: var(--hover); }
+.item[aria-selected="true"] { background: var(--selected-bg); color: var(--selected-text); }
+
+/* ----------------------------------------------------- Menu (cr-action-menu) */
+
+.menu {
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    min-width: 128px;
+    padding: 8px 0;
+    border: 0;
+    border-radius: 4px;
+    background: var(--menu-bg);
+    color: var(--text);
+    box-shadow: var(--menu-shadow);
+}
+
+.menu::backdrop { background: transparent; }
+
+.menu [role="menuitem"], .menu .dropdown-item {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    height: auto;
+    min-height: 32px;
+    padding: 8px 24px;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    color: var(--text);
+    font: 400 13px/20px system-ui, sans-serif;
+    text-align: start;
+    white-space: nowrap;
+}
+
+.menu [role="menuitem"]:hover,
+.menu [role="menuitem"]:focus { background: var(--hover); outline: none; }
+.menu [role="menuitem"]:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.menu [role="menuitem"]:disabled { opacity: 0.38; background: none; }
+.menu hr { margin: 8px 0; border: 0; border-top: 1px solid var(--separator); }
+
+/* ------------------------------------------------------- Dialog (cr-dialog) */
+
+.dialog {
+    width: min(512px, calc(100vw - 32px));
+    max-height: calc(100vh - 48px);
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius);
+    background: var(--dialog-bg);
+    color: var(--text);
+    line-height: 20px;
+    box-shadow: var(--dialog-shadow);
+}
+
+.dialog::backdrop { background: rgb(0 0 0 / 0.6); }
+.dialog > form, .dialog > .dialog-content { display: flex; flex-direction: column; max-height: calc(100vh - 48px); }
+.dialog-title { padding: 20px 20px 16px; font-size: 15px; font-weight: 400; line-height: 1.2; }
+.dialog-body { display: grid; gap: 16px; padding: 0 20px; overflow: auto; color: var(--text-secondary); }
+.dialog-body :is(.field, input, textarea, select, label) { color: var(--text); }
+.dialog-body .field > label { color: var(--text-subtle); }
+.dialog-buttons { display: flex; justify-content: flex-end; gap: 8px; padding: 16px; }
+
+/* ------------------------------------------------------- Toast (cr-toast) */
+
+.toast {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    min-width: 288px;
+    max-width: min(568px, calc(100vw - 48px));
+    min-height: 52px;
+    margin: 24px;
+    padding: 0 16px;
+    border-radius: 8px;
+    background: var(--toast-bg);
+    color: var(--toast-text);
+    line-height: 20px;
+    box-shadow: 0 2px 4px 0 rgb(0 0 0 / 0.28);
+}
+
+.toast button {
+    height: auto;
+    margin-right: -8px;
+    padding: 8px;
+    border: 0;
+    background: none;
+    color: var(--toast-action);
+    font-size: 13px;
+    font-weight: 500;
+    text-decoration: none;
+}
+
+/* ------------------------------------------------------ Drawer (cr-drawer) */
+
+.drawer {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: 256px;
+    max-width: calc(100vw - 56px);
+    height: 100%;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: var(--page-bg);
+    color: var(--text);
+    box-shadow: var(--card-shadow);
+}
+
+.drawer[open] { animation: cr-drawer-in 200ms ease; }
+.drawer::backdrop { background: rgb(0 0 0 / 0.5); }
+.drawer-head { display: flex; align-items: center; gap: 12px; height: var(--toolbar-height); padding-left: 24px; font-size: 22px; font-weight: 500; letter-spacing: 0.25px; }
+
+@keyframes cr-drawer-in { from { transform: translateX(-100%); } }
+
+@media (prefers-reduced-motion: reduce) {
+    .drawer[open] { animation: none; }
+}
+
+/* ------------------------------------------------------- Side panel (sp-*) */
+
+/* A side panel page: <body class="side-panel">. Chrome draws the header (title,
+   pin, close); the page is the rest. Its own text colours, as the panel's are. */
+.side-panel {
+    --text: var(--sp-text);
+    --text-secondary: var(--sp-text-secondary);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+    background: var(--sp-bg);
+    color: var(--sp-text);
+}
+
+/* cr-tabs, as panels with more than one view have them: 48px, the chosen one
+   in primary with a 2px bar. <div class="tabs" role="tablist"> of
+   <button class="tab" role="tab" aria-selected="true">. */
+.tabs {
+    flex: none;
+    display: flex;
+    height: 48px;
+    user-select: none;
+}
+
+.tabs .tab {
+    position: relative;
+    flex: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    color: var(--text-secondary);
+    font: 500 14px/20px system-ui, sans-serif;
+}
+
+/* cr-tabs has no hover fill; a pressed tab shows only its ripple. */
+.tabs .tab:hover, .tabs .tab:active { background: none; }
+.tabs .tab:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.tabs .tab[aria-selected="true"] { color: var(--primary); }
+
+.tabs .tab[aria-selected="true"]::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 2px;
+    border-radius: 2px 2px 0 0;
+    background: var(--primary);
+}
+
+/* The scrolling body (.sp-scroller): the scrollbar sits in the 8px gutter. */
+.sp-scroller {
+    flex: 1;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+}
+
+.sp-scroller::-webkit-scrollbar { width: 8px; background: transparent; }
+.sp-scroller::-webkit-scrollbar-thumb {
+    background: var(--sp-scrollbar);
+    background-clip: content-box;
+    border: solid 1.5px transparent;
+    border-radius: 100px;
+}
+
+/* The search field above a panel's list (cr-toolbar-search-field in the Bookmarks panel). */
+.side-panel .search-field {
+    flex: none;
+    width: auto;
+    margin: 8px;
+    background: var(--sp-search-bg);
+}
+
+/* .sp-card: rows on a 12px-rounded card, 8px from the panel's edge. */
+.sp-card {
+    margin: 0 0 0 8px;
+    padding: 8px 0;
+    border-radius: 12px;
+    background: var(--sp-card);
+}
+
+.sp-card + .sp-card { margin-top: 8px; }
+
+/* sp-heading: a 36px heading in a card, with 24px buttons at its end
+   (a group's collapse chevron). <div class="sp-heading"><h2>…</h2>buttons</div> */
+.sp-heading {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    height: 36px;
+    padding: 0 16px;
+}
+
+.sp-card > .sp-heading + .sp-heading,
+.sp-card > .sp-item + .sp-heading,
+.sp-card > .sp-list + .sp-heading { margin-top: 12px; }
+
+.sp-heading > :is(h1, h2, h3) {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 20px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sp-heading .meta { flex: none; color: var(--text-secondary); font-size: 11px; line-height: 16px; }
+
+/* 24px icon buttons with 16px icons (sp-icon-buttons-row, the row suffix). */
+.sp-heading .icon-button,
+.sp-item .icon-button { width: 24px; height: 24px; color: var(--text-secondary); }
+.sp-heading .icon-button .icon,
+.sp-item .icon-button .icon { width: 16px; height: 16px; }
+
+/* A group's chevron (a right-pointing one, turned): up when open, down when
+   folded, as the Reading list's expand-less / expand-more. */
+.sp-heading .expand .icon { transform: rotate(90deg); transition: transform 100ms; }
+.sp-heading .expand[aria-expanded="true"] .icon { transform: rotate(-90deg); }
+
+/* cr-url-list-item: a 48px row, a 40px icon box, a title and a description;
+   buttons at its end show on hover or focus. <li class="sp-item"> holding
+   <button class="sp-item-main"> (the row's own action) and <span class="sp-suffix">. */
+.sp-list { list-style: none; margin: 0; padding: 0; }
+
+.sp-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-height: 48px;
+    padding: 4px 16px;
+}
+
+.sp-item:hover, .sp-item:focus-within { background: var(--hover); }
+.sp-item:active { background: var(--active); }
+
+/* The row's whole area clicks; the suffix buttons sit above it. */
+.sp-item-main {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    cursor: pointer;
+}
+
+.sp-item-main:hover, .sp-item-main:active { background: none; }
+.sp-item-main:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+
+.sp-icon {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    margin-right: 16px;
+    border-radius: 8px;
+    background: var(--sp-icon-bg);
+    color: var(--text-secondary);
+    pointer-events: none;
+}
+
+.sp-text {
+    flex: 1;
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+    pointer-events: none;
+}
+
+.sp-title, .sp-description {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sp-title { color: var(--text); font-size: 12px; font-weight: 500; line-height: 16px; }
+.sp-description { color: var(--text-secondary); font-size: 11px; line-height: 14px; }
+
+.sp-suffix {
+    position: relative;
+    flex: none;
+    display: none;
+    align-items: center;
+    gap: 4px;
+    margin: 0 -4px 0 8px;
+}
+
+.sp-item:is(:hover, :focus-within) .sp-suffix,
+.sp-suffix.always { display: flex; }
+
+/* sp-empty-state: a centred heading and a line of help. */
+.sp-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 16px;
+    text-align: center;
+}
+
+.sp-empty .icon { width: 48px; height: 48px; margin-bottom: 16px; color: var(--primary); }
+.sp-empty h2 { max-width: 259px; margin-bottom: 8px; color: var(--text); font-size: 16px; font-weight: 500; line-height: 24px; }
+.sp-empty p { max-width: 229px; margin-bottom: 12px; color: var(--text-secondary); font-size: 13px; line-height: 20px; }
+
+/* sp-footer pinned at the bottom, holding the floating pill
+   (cr-button.floating-button): "Add current tab", "Add new command". */
+.sp-footer {
+    flex: none;
+    height: 56px;
+    padding: 8px;
+}
+
+button.floating {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 40px;
+    padding: 8px 16px 8px 12px;
+    border: 0;
+    border-radius: 8px;
+    background: var(--tonal-bg);
+    color: var(--tonal-text);
+    transition: box-shadow 80ms linear;
+}
+
+button.floating:hover { background: var(--tonal-bg); box-shadow: var(--elevation-3); }
+button.floating .icon { width: 20px; height: 20px; }
+
+/* The toast in a panel: the panel's width less 8px each side, above the footer. */
+.side-panel .toast {
+    left: 8px;
+    right: 8px;
+    bottom: 56px;
+    min-width: 0;
+    max-width: none;
+    margin: 0;
+}
+
+/* ------------------------------------------------------------ Narrow */
+
+@media (max-width: 720px) {
+    .toolbar { grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; padding-right: 8px; }
+    .toolbar-start { padding-left: 16px; }
+}
