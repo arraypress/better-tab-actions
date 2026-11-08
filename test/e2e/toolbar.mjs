@@ -5,6 +5,8 @@
  * follows a change with no page open.
  *
  *   npm run e2e
+ *
+ * @module test/e2e/toolbar
  */
 import { chromium } from 'playwright';
 import { fileURLToPath } from 'node:url';

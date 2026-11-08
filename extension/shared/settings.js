@@ -24,9 +24,9 @@ import { createSettingsStore } from '../vendor/extension-kit/index.js';
  */
 
 /** The fewest days "Close tabs not used in N days" accepts. */
-export const MIN_DAYS = 1;
+const MIN_DAYS = 1;
 /** The most days it accepts. */
-export const MAX_DAYS = 365;
+const MAX_DAYS = 365;
 
 /** Every setting's default: every action shown, this window, 7 days, grouped tabs included. */
 export const DEFAULTS = /** @type {Readonly<Settings>} */ (Object.freeze({

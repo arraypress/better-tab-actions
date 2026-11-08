@@ -1,5 +1,9 @@
-// The store zip is exactly extension/, less source-only files, and every path the extension
-// names resolves inside it.
+/**
+ * The store zip is exactly extension/, less source-only files, and every path the extension
+ * names resolves inside it.
+ *
+ * @module test/package
+ */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { cp, mkdtemp, rm, writeFile } from 'node:fs/promises';

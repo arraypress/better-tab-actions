@@ -69,7 +69,7 @@ Needs Chrome 150 or later (that’s when Chrome let extensions add to the tab me
 
 ```sh
 npm install          # Playwright, for the browser tests
-npm test             # unit tests (node --test)
+npm test             # lint, type-check (tsc on the JSDoc types), unit tests (node --test), copied-code check
 npm run e2e          # browser tests in Playwright's Chromium
 npm run package      # tests, then release/more-tab-actions.zip for the Chrome Web Store
 ```

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "postinstall": "extension-kit vendor extension/vendor/extension-kit",
-    "test": "node --test test/*.js",
+    "test": "npm run lint && npm run typecheck && node --test test/*.js && npm run duplication",
     "lint": "eslint .",
     "typecheck": "tsc -p .",
     "duplication": "extension-kit duplication",

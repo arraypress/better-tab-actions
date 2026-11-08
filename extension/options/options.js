@@ -88,6 +88,7 @@ function save(changes) {
   renderMenuItems(); // Titles can depend on settings (e.g. the number of days).
 }
 
+/** Show the settings in the Closing tabs card's controls. */
 function renderForm() {
   windowScope.value = settings.windowScope;
   inactiveDays.value = String(settings.inactiveDays);

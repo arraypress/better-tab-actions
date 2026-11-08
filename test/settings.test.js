@@ -1,5 +1,9 @@
-// More Tab Actions' own settings: the schema and how the store keeps it. The store's general
-// behaviour (refused writes, the debounced saver) is tested in @arraypress/extension-kit.
+/**
+ * More Tab Actions' own settings: the schema and how the store keeps it. The store's general
+ * behaviour (refused writes, the debounced saver) is tested in @arraypress/extension-kit.
+ *
+ * @module test/settings
+ */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeChromeStorage } from '@arraypress/extension-kit/testing';

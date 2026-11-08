@@ -6,24 +6,60 @@
  * Window metrics follow Chrome's 2023 refresh on macOS (tabs 34px high in a 42px strip, a 46px
  * toolbar with a pill omnibox). Menus follow macOS's native menu (13px system font, 22px rows):
  * on macOS, Chrome's tab and page context menus are native NSMenus.
+ *
+ * @module store/tools/frame
  */
 
+/**
+ * A shot's window size and zoom: see {@link geometry}.
+ *
+ * @typedef {{zoom: number, w: number, content: {width: number, height: number}}} Geometry
+ */
+
+/**
+ * A tab in the drawn strip.
+ *
+ * @typedef {object} DrawnTab
+ * @property {string} title Its title.
+ * @property {string} icon Its favicon's address.
+ * @property {boolean} [active] The selected tab.
+ * @property {boolean} [audible] Shows the speaker.
+ * @property {boolean} [muted] Shows the muted speaker.
+ */
+
+/**
+ * A row in a drawn menu: an item, or `'sep'` for a separator.
+ *
+ * @typedef {{title: string, icon?: string, iconSvg?: string, sub?: boolean, disabled?: boolean, selected?: boolean} | 'sep'} MenuItem
+ */
+
+/** @typedef {keyof typeof THEMES} ThemeName */
+
+/** The store screenshot's width, px. */
 export const W = 1280;
+/** Its height, px. */
 export const H = 800;
-export const CAPTION_H = 112;
+const CAPTION_H = 112;
+/** Where the Chrome window sits, and its tab strip's and toolbar's heights, px. */
 export const WIN = { x: 64, y: CAPTION_H, w: 1152, strip: 42, toolbar: 46 };
 
 /**
  * A shot's window is drawn at `zoom` (scaled about its top-left corner) so text stays legible
- * when the store shows screenshots small. Returns the window's unscaled width and the size to
- * capture page content at (captured at 2× so the scaling stays sharp).
+ * when the store shows screenshots small.
+ *
+ * @param {number} [zoom] - The scale. Default 1.
+ * @returns {Geometry} The zoom, the window's unscaled width and the size to capture page content
+ *   at (captured at 2× so the scaling stays sharp).
  */
 export function geometry(zoom = 1) {
   const w = Math.round((W - 2 * WIN.x) / zoom);
   return { zoom, w, content: { width: w, height: Math.round((H - WIN.y) / zoom) - WIN.strip - WIN.toolbar } };
 }
-export const CONTENT = geometry(1).content;
 
+/**
+ * @param {unknown} s - Text.
+ * @returns {string} It, escaped for HTML text and attributes.
+ */
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 const P = {
@@ -41,15 +77,37 @@ const P = {
   book: 'M21 5c-1.11-.35-2.33-.5-3.5-.5-1.95 0-4.05.4-5.5 1.5-1.45-1.1-3.55-1.5-5.5-1.5S2.45 4.9 1 6v14.65c0 .25.25.5.5.5.1 0 .15-.05.25-.05C3.1 20.45 5.05 20 6.5 20c1.95 0 4.05.4 5.5 1.5 1.35-.85 3.8-1.5 5.5-1.5 1.65 0 3.35.3 4.75 1.05.1.05.15.05.25.05.25 0 .5-.25.5-.5V6c-.6-.45-1.25-.75-2-1zm0 13.5c-1.1-.35-2.3-.5-3.5-.5-1.7 0-4.15.65-5.5 1.5V8c1.35-.85 3.8-1.5 5.5-1.5 1.2 0 2.4.15 3.5.5v11.5z',
   person: 'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z',
 };
-export const icon = (name, size = 20, extra = '') =>
+/**
+ * A Material icon.
+ *
+ * @param {keyof typeof P} name - Which one.
+ * @param {number} [size] - Its size, px. Default 20.
+ * @param {string} [extra] - More attributes for the `<svg>`.
+ * @returns {string} The SVG markup.
+ */
+const icon = (name, size = 20, extra = '') =>
   `<svg viewBox="0 0 24 24" width="${size}" height="${size}" ${extra}><path fill="currentColor" d="${P[name]}"/></svg>`;
+/**
+ * Chrome's split view icon.
+ *
+ * @param {number} [size] - Its size, px. Default 16.
+ * @returns {string} The SVG markup.
+ */
 const splitIcon = (size = 16) =>
   `<svg viewBox="0 0 16 16" width="${size}" height="${size}"><rect x="1.5" y="2.5" width="13" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.3"/><line x1="8" y1="2.5" x2="8" y2="13.5" stroke="currentColor" stroke-width="1.3"/></svg>`;
 
-/** A letter favicon for made-up sites (no real brands). */
+/**
+ * A letter favicon for made-up sites (no real brands).
+ *
+ * @param {string} letter - The letter.
+ * @param {string} bg - The tile's colour.
+ * @param {string} [fg] - The letter's colour. Default white.
+ * @returns {string} A data: URL.
+ */
 export const letterIcon = (letter, bg, fg = '#fff') =>
   `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16" rx="4" fill="${bg}"/><text x="8" y="12" font-family="-apple-system,Helvetica,Arial" font-size="11" font-weight="700" text-anchor="middle" fill="${fg}">${letter}</text></svg>`)}`;
 
+/** The colours of the canvas, window and menus, light and dark. */
 export const THEMES = {
   light: {
     bg: '#eef2f8', caption: '#1f1f1f', sub: '#444746',
@@ -72,7 +130,17 @@ const ACCENT = 'rgb(10 100 230)';
 
 const TAB_H = 34;
 
-/** Lay out tabs like Chrome: equal widths up to 240px, shrinking to fit. Returns x offsets. */
+/**
+ * Lay out tabs like Chrome: equal widths up to 240px, shrinking to fit.
+ *
+ * @param {readonly unknown[]} tabs - The tabs (only their number counts).
+ * @param {object} [options] - The strip.
+ * @param {number} [options.left] - Where the first tab starts. Default 84.
+ * @param {number} [options.right] - Room kept free at the end. Default 60.
+ * @param {number} [options.max] - The widest a tab gets. Default 240.
+ * @param {number} [options.w] - The window's width. Default {@link WIN}'s.
+ * @returns {{x: number, width: number}[]} Each tab's window-relative x offset and width.
+ */
 export function tabLayout(tabs, { left = 84, right = 60, max = 240, w = WIN.w } = {}) {
   const avail = w - left - right - 36;
   const width = Math.min(max, Math.floor(avail / tabs.length));
@@ -80,12 +148,22 @@ export function tabLayout(tabs, { left = 84, right = 60, max = 240, w = WIN.w } 
 }
 
 /**
- * The window's tab strip and toolbar. `tabs`: [{ title, icon, active, audible, muted, pinned }].
- * Positions are window-relative; `tabX(i)` (from tabLayout) gives page coordinates for menus.
+ * The window's tab strip and toolbar. Positions are window-relative; add {@link WIN}'s x and y
+ * for page coordinates.
+ *
+ * @param {object} options - What the window shows.
+ * @param {readonly DrawnTab[]} options.tabs - The tabs, in order.
+ * @param {string} options.url - The omnibox text.
+ * @param {string} [options.urlHost] - Its start, drawn darker (the rest is dimmed).
+ * @param {ThemeName} [options.theme] - Default light.
+ * @param {number} [options.w] - The window's width. Default {@link WIN}'s.
+ * @param {{x: number, width: number}[]} [options.layout] - From {@link tabLayout}. Default: laid out to `w`.
+ * @param {readonly string[]} [options.ext] - Extension icons to show in the toolbar.
+ * @param {readonly number[]} [options.marks] - Indexes of tabs to outline.
+ * @returns {string} The HTML, with its styles.
  */
 export function windowChrome({ tabs, url, urlHost, theme = 'light', w = WIN.w, layout = tabLayout(tabs, { w }), ext = [], marks = [] }) {
   const t = THEMES[theme];
-  const activeIndex = tabs.findIndex((tab) => tab.active);
   const tabHtml = tabs.map((tab, i) => {
     const { x, width } = layout[i];
     const sepAfter = i < tabs.length - 1 && !tab.active && !tabs[i + 1].active;
@@ -141,15 +219,28 @@ export function windowChrome({ tabs, url, urlHost, theme = 'light', w = WIN.w, l
   </style>`;
 }
 
-/**
- * A macOS context menu. items: { title, icon, iconSvg, sub: true, disabled, selected } or 'sep'.
- * Returns { html, height, width, rowTop(i) } with (x, y) its page position.
- */
+/** A macOS menu's metrics, px: padding, row and separator heights, corner radius. */
 export const MENU = { pad: 5, row: 22, sep: 11, radius: 10 };
+
+/**
+ * A macOS context menu.
+ *
+ * @param {readonly MenuItem[]} items - Its rows.
+ * @param {object} place - Where and how.
+ * @param {number} place.x - Its page x.
+ * @param {number} place.y - Its page y.
+ * @param {number} place.width - Its width.
+ * @param {ThemeName} [place.theme] - Default light.
+ * @param {string} [place.id] - An id for the element.
+ * @returns {{html: string, height: number, width: number, x: number, y: number, rowTop: (i: number) => number}}
+ *   The markup, its box, and the page y of row `i`.
+ */
 export function menu(items, { x, y, width, theme = 'light', id = '' }) {
   const t = THEMES[theme];
   let top = MENU.pad;
+  /** @type {string[]} */
   const rows = [];
+  /** @type {number[]} */
   const tops = [];
   for (const item of items) {
     tops.push(top);
@@ -172,11 +263,18 @@ export function menu(items, { x, y, width, theme = 'light', id = '' }) {
   const html = `<div class="mac-menu" ${id ? `id="${id}"` : ''} style="left:${x}px;top:${y}px;width:${width}px;height:${height}px;background:${t.menuBg};box-shadow:0 0 0 .5px ${t.menuBorder}, 0 12px 32px rgba(0,0,0,${theme === 'dark' ? '.5' : '.22'}), 0 2px 6px rgba(0,0,0,.08)">${rows.join('')}</div>`;
   return { html, height, width, x, y, rowTop: (i) => y + tops[i] };
 }
+/**
+ * A submenu's chevron.
+ *
+ * @param {string} color - Its colour.
+ * @returns {string} The SVG markup.
+ */
 const chevron = (color) =>
   `<svg width="8" height="12" viewBox="0 0 8 12"><path d="M1.5 1 L6.5 6 L1.5 11" fill="none" stroke="${color}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+/** Icons Chrome's tab menu shows: split view and reading list. */
 export const MENU_ICONS = { split: splitIcon(16), book: icon('book', 16) };
 
-export const MENU_CSS = `
+const MENU_CSS = `
   .mac-menu { position: absolute; border-radius: ${MENU.radius}px; -webkit-backdrop-filter: blur(30px) saturate(1.6); backdrop-filter: blur(30px) saturate(1.6); font: 13px/16px system-ui; z-index: 10; }
   .m-row { position: absolute; left: ${MENU.pad}px; right: ${MENU.pad}px; height: ${MENU.row}px; display: flex; align-items: center; padding: 0 10px 0 9px; border-radius: 5px; white-space: nowrap; }
   .m-row.sel { background: ${ACCENT}; }
@@ -184,13 +282,27 @@ export const MENU_CSS = `
   .m-chev { display: flex; margin-left: 16px; }
   .m-sep { position: absolute; left: 14px; right: 14px; height: 1px; }`;
 
-/** The macOS arrow pointer, tip at (x, y). */
+/**
+ * The macOS arrow pointer.
+ *
+ * @param {number} x - Its tip's page x.
+ * @param {number} y - Its tip's page y.
+ * @returns {string} The SVG markup.
+ */
 export const cursor = (x, y) => `<svg style="position:absolute;left:${x - 4}px;top:${y - 3}px;z-index:20;filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.35))" width="22" height="30" viewBox="0 0 22 30">
   <path d="M4 3 L4 24 L9 19.5 L12.4 27 L15.6 25.6 L12.3 18.3 L19 18.3 Z" fill="#000" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg>`;
 
 /**
  * The full page: caption band, window, content and overlays.
- * content: an <img> src (a capture at CONTENT size) or raw HTML.
+ *
+ * @param {object} shot - What it shows.
+ * @param {string} shot.caption - The caption.
+ * @param {ThemeName} [shot.theme] - Default light.
+ * @param {string} shot.chrome - The window's strip and toolbar, from {@link windowChrome}.
+ * @param {string} shot.content - An <img> src (a capture at `geo`'s content size) or raw HTML.
+ * @param {string} [shot.overlays] - Markup over everything (menus, the pointer).
+ * @param {Geometry} [shot.geo] - The window's zoom. Default {@link geometry}(1).
+ * @returns {string} The HTML page.
  */
 export function canvas({ caption, theme = 'light', chrome, content, overlays = '', geo = geometry(1) }) {
   const t = THEMES[theme];

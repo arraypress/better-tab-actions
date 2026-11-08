@@ -17,6 +17,8 @@
  * submenus (docs/bug-report/report.md), so that's what users see today.
  *
  * Web pages in the shots are made up (no real sites); photos are CC0 from Wikimedia Commons.
+ *
+ * @module store/tools/make-screenshots
  */
 import { chromium } from 'playwright';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -27,12 +29,30 @@ import {
   H, MENU, MENU_ICONS, THEMES, W, WIN, canvas, cursor, geometry, letterIcon, menu, tabLayout, windowChrome,
 } from './frame.mjs';
 
+/** @import { Page } from 'playwright' */
+/** @import { DrawnTab, Geometry, MenuItem, ThemeName } from './frame.mjs' */
+/** @import { MenuEntry } from '../../extension/shared/actions.js' */
+/** @import * as Actions from '../../extension/shared/actions.js' */
+/** @import * as SettingsModule from '../../extension/shared/settings.js' */
+
+/**
+ * The extension's own modules, as the options page imports them (relative to options/), for
+ * code run inside it.
+ */
+const MODULES = { actions: '../shared/actions.js', settings: '../shared/settings.js' };
+
 const ZOOMED = geometry(1.2);
 const tools = path.dirname(fileURLToPath(import.meta.url));
 const store = path.dirname(tools);
 const extension = path.join(path.dirname(store), 'extension');
 const tmp = await mkdtemp(path.join(tmpdir(), 'mta-store-'));
+/**
+ * @param {string} file - A local file.
+ * @param {string} [type] - Its media type. Default PNG.
+ * @returns {Promise<string>} It, as a data: URL.
+ */
 const dataUrl = async (file, type = 'image/png') => `data:${type};base64,${(await readFile(file)).toString('base64')}`;
+/** @param {string} name - A photo in photos/, without .jpg. */
 const photo = (name) => dataUrl(path.join(tools, 'photos', `${name}.jpg`), 'image/jpeg');
 const EXT_ICON = await dataUrl(path.join(extension, 'icons', 'icon-32.png'));
 
@@ -47,7 +67,17 @@ const SITES = {
   meet: { brand: 'Huddle', color: '#00897b', icon: letterIcon('H', '#00897b') },
 };
 
-/** A plain article page for a made-up site. */
+/**
+ * A plain article page for a made-up site.
+ *
+ * @param {object} article - Its parts.
+ * @param {keyof typeof SITES} article.site - Whose.
+ * @param {string} article.kicker - The section above the headline.
+ * @param {string} article.title - The page title ("Headline – Site").
+ * @param {string} article.photoUrl - The lead photo.
+ * @param {string} article.dek - The standfirst.
+ * @returns {string} The HTML.
+ */
 function article({ site, kicker, title, photoUrl, dek }) {
   const s = SITES[site];
   return `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>
@@ -83,6 +113,7 @@ const extensionId = new URL(worker.url()).host;
 const optionsUrl = `chrome-extension://${extensionId}/options/options.html`;
 
 // Made-up sites, answered locally (the network edge).
+/** @type {Record<string, string>} */
 const pages = {};
 await context.route('https://*.example/**', (route) => {
   const html = pages[route.request().url()];
@@ -102,7 +133,18 @@ const PAGES = {
 };
 for (const { url, html } of Object.values(PAGES)) pages[url] = html;
 
-/** Screenshot `url` at the window's content size for `geo` (at 2×). */
+/**
+ * Screenshot `url` at the window's content size for `geo` (at 2×).
+ *
+ * @param {Page} page - The tab to use.
+ * @param {string} url - What to load.
+ * @param {string} file - The capture's name in the temporary folder.
+ * @param {object} [options] - How.
+ * @param {Geometry} [options.geo] - The window's zoom. Default 1.2.
+ * @param {() => void} [options.scrollTo] - Run in the page before the capture.
+ * @param {boolean} [options.dark] - Emulate dark mode.
+ * @returns {Promise<string>} The capture, as a data: URL.
+ */
 async function capture(page, url, file, { geo = ZOOMED, scrollTo, dark = false } = {}) {
   await page.setViewportSize(geo.content);
   await page.emulateMedia({ colorScheme: dark ? 'dark' : 'light' });
@@ -118,20 +160,41 @@ async function capture(page, url, file, { geo = ZOOMED, scrollTo, dark = false }
 // The submenu, as the build makes it (default settings; state as given, on top of NO_STATE).
 const helper = await context.newPage();
 await helper.goto(optionsUrl);
-const entries = (state) => helper.evaluate(async (state) => {
-  const { menuEntries, NO_STATE } = await import('../shared/actions.js');
-  const { DEFAULTS } = await import('../shared/settings.js');
+/**
+ * @param {Partial<Actions.MenuState>} state - What differs from NO_STATE.
+ * @returns {Promise<MenuEntry[]>} The submenu's entries.
+ */
+const entries = (state) => helper.evaluate(async ({ state, modules }) => {
+  const { menuEntries, NO_STATE } = /** @type {typeof Actions} */ (await import(modules.actions));
+  const { DEFAULTS } = /** @type {typeof SettingsModule} */ (await import(modules.settings));
   return menuEntries(DEFAULTS, { ...NO_STATE, ...state });
-}, state);
+}, { state, modules: MODULES });
 // The menu shots' window: five ungrouped tabs, none pinned, so the group items are enabled.
 const defaultEntries = await entries({ ungroupedTabs: 5 });
-// Chrome drops the separator in tab-menu submenus (see the header).
-const shown = (list) => list.filter((entry) => !entry.separator);
+/**
+ * Chrome drops the separator in tab-menu submenus (see the header).
+ *
+ * @param {readonly MenuEntry[]} list - The entries.
+ * @returns {Extract<MenuEntry, {id: string}>[]} The ones a user sees.
+ */
+const shown = (list) => list.flatMap((entry) => (entry.separator ? [] : [entry]));
+
+/**
+ * @param {readonly MenuEntry[]} list - The entries.
+ * @param {string} id - An action.
+ * @returns {string} Its label.
+ */
+const titleOf = (list, id) => {
+  const title = list.find((entry) => entry.id === id)?.title;
+  if (!title) throw new Error(`No menu entry ${id}`);
+  return title;
+};
 
 // ---------------------------------------------------------------- real duplicate run
 
 /** Open real tabs, run "Close duplicate tabs" on the active one, and read the strip before and after. */
 async function duplicateRun() {
+  /** @type {(keyof typeof PAGES)[]} */
   const order = ['bierstadt', 'mail', 'bierstadt', 'plan', 'lighthouses', 'mail', 'bierstadt', 'food'];
   const opened = [];
   for (const key of order) {
@@ -142,23 +205,23 @@ async function duplicateRun() {
   await opened[0].bringToFront();
   await opened[0].waitForTimeout(300);
   const strip = () => helper.evaluate(async (urls) => {
-    const [win] = await chrome.windows.getAll({ populate: true });
     const all = await chrome.tabs.query({});
-    return all.filter((tab) => urls.includes(tab.url)).sort((a, b) => a.windowId - b.windowId || a.index - b.index)
+    return all.filter((tab) => tab.url !== undefined && urls.includes(tab.url)).sort((a, b) => a.windowId - b.windowId || a.index - b.index)
       .map(({ id, title, url, active, windowId }) => ({ id, title, url, active, windowId }));
   }, Object.values(PAGES).map((p) => p.url));
   const before = await strip();
-  const target = before[0];
-  const closed = await helper.evaluate(async (targetId) => {
-    const { runAction } = await import('../shared/actions.js');
-    const { loadSettings } = await import('../shared/settings.js');
+  const targetId = before[0]?.id;
+  if (targetId === undefined) throw new Error('No tabs opened');
+  const closed = await helper.evaluate(async ({ targetId, modules }) => {
+    const { runAction } = /** @type {typeof Actions} */ (await import(modules.actions));
+    const { settingsStore } = /** @type {typeof SettingsModule} */ (await import(modules.settings));
     const tab = await chrome.tabs.get(targetId);
-    const browser = { tabs: chrome.tabs, windows: chrome.windows, session: chrome.storage.session };
-    return runAction('close-duplicate-tabs', tab, browser, { settings: await loadSettings(chrome.storage), extensionId: chrome.runtime.id });
-  }, target.id);
+    const browser = { tabs: chrome.tabs, windows: chrome.windows, session: chrome.storage.session, tabGroups: chrome.tabGroups };
+    return runAction('close-duplicate-tabs', tab, browser, { settings: await settingsStore.load(chrome.storage), extensionId: chrome.runtime.id });
+  }, { targetId, modules: MODULES });
   const after = await strip();
   for (const page of opened) if (!page.isClosed()) await page.close();
-  return { before, after, closed, targetId: target.id };
+  return { before, after, closed, targetId };
 }
 const dup = await duplicateRun();
 console.log(`Duplicates: ${dup.before.length} tabs → ${dup.after.length} (closed ${dup.closed.length})`);
@@ -171,11 +234,18 @@ const content = {
   bierstadt: await capture(shotPage, PAGES.bierstadt.url, 'bierstadt.png'),
   lakes: await capture(shotPage, PAGES.lakes.url, 'lakes.png'),
 };
-const siteIcon = (url) => (url.includes('trailhead') ? SITES.trail.icon : url.includes('postbox') ? SITES.mail.icon : url.includes('taskboard') ? SITES.plan.icon : SITES.food.icon);
+/** @param {string | undefined} url - A made-up site's address. */
+const siteIcon = (url = '') => (url.includes('trailhead') ? SITES.trail.icon : url.includes('postbox') ? SITES.mail.icon : url.includes('taskboard') ? SITES.plan.icon : SITES.food.icon);
 
 // ---------------------------------------------------------------- Chrome's tab menu (drawn)
 
-/** Chrome 157's tab context menu on macOS for an active tab, one window, no groups, signed out. */
+/**
+ * Chrome 157's tab context menu on macOS for an active tab, one window, no groups, signed out.
+ *
+ * @param {object} options - What depends on the tab.
+ * @param {boolean} [options.closeRightEnabled] - Whether there are tabs to its right. Default true.
+ * @returns {MenuItem[]} The rows.
+ */
 function chromeTabMenu({ closeRightEnabled = true }) {
   return [
     { title: 'New Tab to the Right' },
@@ -201,7 +271,22 @@ function chromeTabMenu({ closeRightEnabled = true }) {
 }
 const OURS_INDEX = 14;
 
-/** Tab strip + the open menu and submenu, with the pointer on `hover` (a submenu title). */
+/**
+ * Tab strip + the open menu and submenu, with the pointer on `hover` (a submenu title).
+ *
+ * @param {object} shot - What it shows.
+ * @param {string} shot.caption - The caption.
+ * @param {DrawnTab[]} shot.tabs - The tabs.
+ * @param {string} shot.url - The omnibox text.
+ * @param {string} shot.urlHost - Its host.
+ * @param {string} shot.page - The content capture.
+ * @param {string} shot.hover - The submenu title under the pointer.
+ * @param {MenuEntry[]} shot.entryList - The submenu.
+ * @param {ThemeName} [shot.theme] - Default light.
+ * @param {number} shot.clickTab - The right-clicked tab's index.
+ * @param {Geometry} [shot.geo] - The window's zoom. Default 1.2.
+ * @returns {string} The HTML page.
+ */
 function menuShot({ caption, tabs, url, urlHost, page, hover, entryList, theme = 'light', clickTab, geo = ZOOMED }) {
   const layout = tabLayout(tabs, { w: geo.w });
   const chrome = windowChrome({ tabs, url, urlHost, theme, w: geo.w, layout, ext: [] });
@@ -217,6 +302,10 @@ function menuShot({ caption, tabs, url, urlHost, page, hover, entryList, theme =
   return canvas({ caption, theme, chrome, content: page, overlays: main.html + sub.html + pointer, geo });
 }
 
+/**
+ * @param {number} active - The index of the selected tab.
+ * @returns {DrawnTab[]} Five tabs, three from the trail site.
+ */
 const trailTabs = (active) => [
   { title: 'Inbox (3) – Postbox', icon: SITES.mail.icon },
   { title: 'Bierstadt Lake loop – Trailhead Journal', icon: SITES.trail.icon, active: active === 1 },
@@ -225,6 +314,7 @@ const trailTabs = (active) => [
   { title: 'Ten mountain lakes – Trailhead Journal', icon: SITES.trail.icon },
 ];
 
+/** @type {string[]} */
 const shots = [];
 
 // 1. Close every tab from this site.
@@ -233,7 +323,7 @@ shots.push(menuShot({
   tabs: trailTabs(1),
   url: 'trailhead.example/bierstadt-lake-loop', urlHost: 'trailhead.example',
   page: content.bierstadt,
-  hover: shown(defaultEntries)[0].title,
+  hover: shown(defaultEntries)[0]?.title ?? '',
   entryList: defaultEntries,
   clickTab: 1,
 }));
@@ -242,14 +332,23 @@ shots.push(menuShot({
 {
   const geo = geometry(1);
   const page = await capture(shotPage, PAGES.bierstadt.url, 'bierstadt-wide.png', { geo });
-  const toTabs = (list) => list.map((tab) => ({ title: tab.title, icon: siteIcon(tab.url), active: tab.id === dup.targetId }));
+  /**
+   * @param {typeof dup.before} list - Tabs read from Chrome.
+   * @returns {DrawnTab[]} Them, to draw.
+   */
+  const toTabs = (list) => list.map((tab) => ({ title: tab.title ?? '', icon: siteIcon(tab.url), active: tab.id === dup.targetId }));
+  /**
+   * @param {typeof dup.before} list - Tabs read from Chrome.
+   * @param {number[]} [marks] - Indexes to outline.
+   * @returns {string} The window's strip and toolbar.
+   */
   const strip = (list, marks = []) => {
     const tabs = toTabs(list);
     return windowChrome({ tabs, url: 'trailhead.example/bierstadt-lake-loop', urlHost: 'trailhead.example', layout: tabLayout(tabs, { max: 200 }), marks });
   };
   const closedIds = new Set(dup.closed);
-  const marks = dup.before.flatMap((tab, i) => (closedIds.has(tab.id) ? [i] : []));
-  const closeTitle = defaultEntries.find((entry) => entry.id === 'close-duplicate-tabs').title;
+  const marks = dup.before.flatMap((tab, i) => (tab.id !== undefined && closedIds.has(tab.id) ? [i] : []));
+  const closeTitle = titleOf(defaultEntries, 'close-duplicate-tabs');
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
     body { margin: 0; width: ${W}px; height: ${H}px; overflow: hidden; position: relative; background: ${THEMES.light.bg}; -webkit-font-smoothing: antialiased; }
     .caption { position: absolute; left: 0; right: 0; top: 0; height: 112px; display: grid; place-items: center; font: 500 32px/1.2 system-ui; letter-spacing: -.2px; color: #1f1f1f; }
@@ -282,10 +381,33 @@ shots.push(menuShot({
   ],
   url: 'trailhead.example/mountain-lakes', urlHost: 'trailhead.example',
   page: content.lakes,
-  hover: defaultEntries.find((entry) => entry.id === 'mute-other-tabs').title,
+  hover: titleOf(defaultEntries, 'mute-other-tabs'),
   entryList: defaultEntries,
   clickTab: 1,
 }));
+
+/**
+ * A shot of the options page, as the active tab of two.
+ *
+ * @param {object} shot - What it shows.
+ * @param {string} shot.caption - The caption.
+ * @param {string} shot.page - The options page's capture.
+ * @param {ThemeName} [shot.theme] - Default light.
+ * @returns {string} The HTML page.
+ */
+function optionsShot({ caption, page, theme = 'light' }) {
+  const tabs = [
+    { title: 'Bierstadt Lake loop – Trailhead Journal', icon: SITES.trail.icon },
+    { title: 'More Tab Actions settings', icon: EXT_ICON, active: true },
+  ];
+  return canvas({
+    caption,
+    theme,
+    chrome: windowChrome({ tabs, url: optionsUrl, theme, w: ZOOMED.w, ext: [EXT_ICON] }),
+    content: page,
+    geo: ZOOMED,
+  });
+}
 
 // 4. Options page (light): the Menu card, with one action switched off by a real click.
 {
@@ -294,39 +416,23 @@ shots.push(menuShot({
   await shotPage.getByRole('switch').nth(4).click(); // "Close tabs to the left"
   await shotPage.waitForTimeout(2000); // let "Saved" fade
   const page = await capture(shotPage, optionsUrl, 'options-light.png');
-  const tabs = [
-    { title: 'Bierstadt Lake loop – Trailhead Journal', icon: SITES.trail.icon },
-    { title: 'More Tab Actions settings', icon: EXT_ICON, active: true },
-  ];
-  shots.push(canvas({
-    caption: 'Choose what’s in the menu',
-    chrome: windowChrome({ tabs, url: `chrome-extension://${extensionId}/options/options.html`, w: ZOOMED.w, ext: [EXT_ICON] }),
-    content: page,
-    geo: ZOOMED,
-  }));
+  shots.push(optionsShot({ caption: 'Choose what’s in the menu', page }));
 }
 
 // 5. Options page (dark): closing settings and shortcuts, from the Closing tabs title down.
 {
-  const geo = ZOOMED;
   const page = await capture(shotPage, optionsUrl, 'options-dark.png', {
-    geo,
     dark: true,
-    scrollTo: () => scrollTo(0, document.getElementById('h-closing').getBoundingClientRect().top + scrollY - 16),
+    scrollTo: () => {
+      const title = document.getElementById('h-closing');
+      if (!title) throw new Error('No Closing tabs title');
+      scrollTo(0, title.getBoundingClientRect().top + scrollY - 16);
+    },
   });
-  const fits = await shotPage.evaluate(() => document.getElementById('h-shortcuts').nextElementSibling.getBoundingClientRect().bottom <= innerHeight);
+  const fits = await shotPage.evaluate(() =>
+    (document.getElementById('h-shortcuts')?.nextElementSibling?.getBoundingClientRect().bottom ?? Infinity) <= innerHeight);
   if (!fits) throw new Error('Shot 5: the Keyboard shortcuts card no longer fits');
-  const tabs = [
-    { title: 'Bierstadt Lake loop – Trailhead Journal', icon: SITES.trail.icon },
-    { title: 'More Tab Actions settings', icon: EXT_ICON, active: true },
-  ];
-  shots.push(canvas({
-    caption: 'Pick the windows, the days and your shortcuts',
-    theme: 'dark',
-    chrome: windowChrome({ tabs, url: `chrome-extension://${extensionId}/options/options.html`, theme: 'dark', w: geo.w, ext: [EXT_ICON] }),
-    content: page,
-    geo,
-  }));
+  shots.push(optionsShot({ caption: 'Pick the windows, the days and your shortcuts', page, theme: 'dark' }));
 }
 
 await context.close();

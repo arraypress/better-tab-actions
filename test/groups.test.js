@@ -1,26 +1,40 @@
+/**
+ * "Save this window as a group" and "Close window and keep as group" against the in-memory
+ * browser, which keeps Chrome's saved groups as Chromium does; and the group's name.
+ *
+ * @module test/groups
+ */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { menuEntries, menuState, runAction, groupTitle } from '../extension/shared/actions.js';
+import { menuEntries, menuState, groupTitle } from '../extension/shared/actions.js';
 import { DEFAULTS } from '../extension/shared/settings.js';
 import { closedCount } from '../extension/shared/undo.js';
-import { fakeBrowser, EXTENSION_ID } from './fake-browser.js';
+import { fakeBrowser, runOn, tabsAt, EXTENSION_ID } from './fake-browser.js';
 
 const NOW = Date.UTC(2026, 10, 8, 12);
 
-/** Run an action on tab `targetId` (or the active tab if null), as the background does. */
-const run = (b, id, targetId, locale = 'en-GB') =>
-  runAction(id, targetId == null ? undefined : b.tab(targetId), b, {
-    now: NOW,
-    settings: DEFAULTS,
-    extensionId: EXTENSION_ID,
-    locale,
-  });
+/**
+ * Run an action on tab `targetId` (or the active tab if null), as the background does, in en-GB.
+ *
+ * @param {ReturnType<typeof fakeBrowser>} b - The browser.
+ * @param {string} id - The action.
+ * @param {number | null} targetId - The clicked tab.
+ * @returns {Promise<number[]>} The tabs it acted on.
+ */
+const run = (b, id, targetId) => runOn(b, id, targetId, { now: NOW, locale: 'en-GB' });
 
-/** The two group items as the menu would show them, for the given window. */
+/**
+ * The two group items as the menu would show them, for the given window.
+ *
+ * @param {ReturnType<typeof fakeBrowser>} b - The browser.
+ * @param {number} windowId - The focused window.
+ * @returns {Promise<{save?: boolean, close?: boolean}>} Whether each is enabled.
+ */
 async function groupItems(b, windowId) {
   const state = menuState(await b.tabs.query({}), await closedCount(b.session), EXTENSION_ID, windowId);
   const entries = menuEntries(DEFAULTS, state);
-  const enabled = (id) => entries.find((e) => e.id === id).enabled;
+  /** @param {string} id */
+  const enabled = (id) => entries.find((e) => e.id === id)?.enabled;
   return { save: enabled('save-window-as-group'), close: enabled('close-window-keep-group') };
 }
 
@@ -79,6 +93,7 @@ test('save-window-as-group: from a shortcut, groups the active tab’s window', 
 });
 
 test('groupTitle: the site with the most tabs; a tie or no web pages gives today’s date, in the user’s locale', () => {
+  /** @param {...string} urls */
   const tabs = (...urls) => urls.map((url) => ({ url }));
   assert.equal(groupTitle(tabs('https://github.com/', 'https://github.com/x', 'https://a.com/'), NOW, 'en-GB'), 'github.com');
   assert.equal(groupTitle(tabs('https://solo.com/', 'chrome://newtab/'), NOW, 'en-GB'), 'solo.com');
@@ -88,10 +103,7 @@ test('groupTitle: the site with the most tabs; a tie or no web pages gives today
 });
 
 test('save-window-as-group: a tie between sites names the group by date', async () => {
-  const b = fakeBrowser([
-    { id: 1, url: 'https://a.com/' },
-    { id: 2, url: 'https://b.com/' },
-  ]);
+  const b = fakeBrowser(tabsAt('https://a.com/', 'https://b.com/'));
   await run(b, 'save-window-as-group', 1);
   assert.equal(b.groups[0].title, '8 Nov');
   assert.equal(b.saved[0].title, '8 Nov');
@@ -111,10 +123,7 @@ test('save-window-as-group: nothing ungrouped means no group, and the menu item 
 });
 
 test('menu: the group items follow the window as tabs are grouped', async () => {
-  const b = fakeBrowser([
-    { id: 1, url: 'https://a.com/' },
-    { id: 2, url: 'https://b.com/' },
-  ]);
+  const b = fakeBrowser(tabsAt('https://a.com/', 'https://b.com/'));
   assert.deepEqual(await groupItems(b, 1), { save: true, close: true });
   await run(b, 'save-window-as-group', 1);
   assert.deepEqual(await groupItems(b, 1), { save: false, close: false });

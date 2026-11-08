@@ -8,6 +8,8 @@
  * Checks: settings are written to Chrome Sync, a burst of clicks is one write, a change still
  * waiting is written as the page closes, the background's menu follows, there's no sync switch,
  * and the About card shows the manifest's version and the links from about-links.js.
+ *
+ * @module test/e2e/options
  */
 import { chromium } from 'playwright';
 import { readFile } from 'node:fs/promises';
@@ -16,23 +18,35 @@ import assert from 'node:assert/strict';
 import { launchExtension, until } from '@arraypress/extension-kit/testing';
 import { ABOUT_LINKS } from '../../extension/options/about-links.js';
 
+/**
+ * The service worker's global scope, with this check's count of writes to Chrome Sync.
+ *
+ * @typedef {typeof globalThis & {syncWrites: number}} WorkerScope
+ */
+
 const extension = fileURLToPath(new URL('../../extension', import.meta.url));
 const { context, worker, url, close } = await launchExtension(chromium, extension, { prefix: 'mta-e2e-' });
 
 try {
   // Local holds only what's this computer's: the toolbar glyph's scheme (toolbar-theme.js) aside, nothing.
+  /** What sync and local hold (local without the toolbar glyph's key). */
   const stored = () => worker.evaluate(async () => {
-    const { toolbarDark, ...local } = await chrome.storage.local.get(null);
+    const local = await chrome.storage.local.get(null);
+    delete local.toolbarDark;
     return { sync: await chrome.storage.sync.get(null), local };
   });
+  /** How many times sync has changed since the count started. */
+  const syncWrites = () => worker.evaluate(() => /** @type {WorkerScope} */ (globalThis).syncWrites);
   await worker.evaluate(() => {
-    globalThis.syncWrites = 0;
-    chrome.storage.sync.onChanged.addListener(() => { globalThis.syncWrites++; });
+    const scope = /** @type {WorkerScope} */ (globalThis);
+    scope.syncWrites = 0;
+    chrome.storage.sync.onChanged.addListener(() => { scope.syncWrites++; });
   });
+  /** Open the options page once its menu switches are drawn. */
   const open = async () => {
     const page = await context.newPage();
     await page.goto(url('options/options.html'));
-    await page.waitForFunction(() => document.getElementById('menu-items').children.length);
+    await page.waitForFunction(() => document.getElementById('menu-items')?.children.length);
     return page;
   };
 
@@ -60,16 +74,16 @@ try {
     await page.locator('#windowScope').selectOption('all');
     await page.locator('#inactiveDays').fill('30');
     await page.locator('#inactiveDays').dispatchEvent('change');
-    assert.equal(await worker.evaluate(() => globalThis.syncWrites), 0, 'nothing written mid-burst');
+    assert.equal(await syncWrites(), 0, 'nothing written mid-burst');
     await until(async () => (await stored()).sync.inactiveDays === 30, 'the settings to reach sync');
     await page.waitForTimeout(1500);
-    assert.equal(await worker.evaluate(() => globalThis.syncWrites), 1);
+    assert.equal(await syncWrites(), 1);
     assert.deepEqual(await stored(), { sync: { includeGroupedTabs: false, windowScope: 'all', inactiveDays: 30 }, local: {} });
     // The background rebuilt the menu from sync: the inactive item names the new days.
-    await until(() => worker.evaluate(() => new Promise((resolve) =>
-      chrome.contextMenus.update('close-inactive-tabs', { title: 'Close tabs not used in 30 days' }, () => resolve(!chrome.runtime.lastError)))), 'the menu');
+    await until(() => worker.evaluate(() =>
+      chrome.contextMenus.update('close-inactive-tabs', { title: 'Close tabs not used in 30 days' }).then(() => true, () => false)), 'the menu');
     await page.reload();
-    await page.waitForFunction(() => document.getElementById('inactiveDays').value === '30');
+    await page.waitForFunction(() => /** @type {HTMLInputElement | null} */ (document.getElementById('inactiveDays'))?.value === '30');
     assert.equal(await grouped.isChecked(), false);
     await page.close();
     console.log('✔ eleven quick changes made one sync write; the page and menu read them back from sync');

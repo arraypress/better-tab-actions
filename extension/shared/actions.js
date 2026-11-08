@@ -1,41 +1,168 @@
+/**
+ * The actions in the "More tab actions" submenu: what each one does (as a plan worked out from
+ * the tabs), how the menu shows it, and running it against the chrome APIs. Loaded by the
+ * service worker and the options page.
+ *
+ * @module shared/actions
+ */
 import { siteKey, tabUrl, pageKey } from './sites.js';
 import { DEFAULTS } from './settings.js';
 import { recordClosed, reopenClosed } from './undo.js';
 
+/** @import { Tab } from './sites.js' */
+/** @import { Settings } from './settings.js' */
+/** @import { UndoApis } from './undo.js' */
+
+/**
+ * Live state some menu labels depend on ({@link NO_STATE}'s shape).
+ *
+ * @typedef {object} MenuState
+ * @property {number} closedCount Tabs in the closed batch "Reopen closed tabs" brings back.
+ * @property {boolean} mutedByUs Whether any tab is muted by this extension.
+ * @property {number} ungroupedTabs Tabs in the window that are neither pinned nor in a group:
+ *   what "Save this window as a group" gathers.
+ * @property {number} pinnedTabs Pinned tabs in the window.
+ * @property {boolean} incognito Whether the window is incognito.
+ */
+
+/**
+ * What a plan needs to know besides the tabs.
+ *
+ * @typedef {object} PlanContext
+ * @property {number} now The time, in ms since the epoch.
+ * @property {Settings} settings The user's settings.
+ * @property {string} [extensionId] This extension's id, to tell its mutes from the user's.
+ * @property {string} [locale] For dates in group names; the browser's own when left out.
+ */
+
+/**
+ * One tab move: `id` goes to `index` in its window.
+ *
+ * @typedef {{id: number, index: number}} Move
+ */
+
+/**
+ * What an action will do, worked out before anything changes.
+ *
+ * @typedef {{effect: 'close' | 'mute' | 'unmute', ids: number[]}
+ *   | {effect: 'move', ids: number[], moves: Move[]}
+ *   | {effect: 'group', ids: number[], title: string, closeWindow?: boolean}} Plan
+ */
+
+/**
+ * A menu action. `title` is also the shortcut description in manifest.json; `menuTitle`
+ * overrides it in the menu, and `enabled` can grey it out. An action either has a `plan`, or is
+ * `reopen: true` and reopens the last closed batch instead.
+ *
+ * @typedef {{
+ *   id: string,
+ *   title: string,
+ *   section: number,
+ *   menuTitle?: (settings: Settings, state: MenuState) => string,
+ *   enabled?: (state: MenuState) => boolean,
+ * } & (
+ *   | {plan: (target: Tab, tabs: Tab[], ctx: PlanContext) => Plan, reopen?: undefined}
+ *   | {reopen: true, plan?: undefined}
+ * )} Action
+ */
+
+/**
+ * An entry in the submenu: an action, or a separator between sections.
+ *
+ * @typedef {{id: string, title: string, enabled: boolean, separator?: undefined}
+ *   | {separator: true, id?: undefined, title?: undefined, enabled?: undefined}} MenuEntry
+ */
+
+/**
+ * The chrome APIs {@link runAction} uses, as the slices it calls: `chrome.tabs`,
+ * `chrome.windows`, `chrome.storage.session` and `chrome.tabGroups`. Tests pass an in-memory
+ * stand-in.
+ *
+ * @typedef {UndoApis & {
+ *   tabs: {
+ *     query(query: chrome.tabs.QueryInfo): Promise<Tab[]>,
+ *     remove(tabIds: number[]): Promise<void>,
+ *     move(tabId: number, props: chrome.tabs.MoveProperties): Promise<unknown>,
+ *     update(tabId: number, props: chrome.tabs.UpdateProperties): Promise<unknown>,
+ *   },
+ *   windows: {remove(windowId: number): Promise<void>},
+ *   tabGroups: {update(groupId: number, props: chrome.tabGroups.UpdateProperties): Promise<unknown>},
+ * }} Browser
+ */
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Live state some menu labels depend on. The menu is built before anyone right-clicks, so the
- * window counts describe the last focused window, the one a right-click almost always lands in.
- * Running an action looks again at the tab actually clicked.
+ * The menu state before anything is known: nothing closed, muted or to group. The menu is built
+ * before anyone right-clicks, so the window counts describe the last focused window, the one a
+ * right-click almost always lands in. Running an action looks again at the tab actually clicked.
  */
-export const NO_STATE = Object.freeze({
+export const NO_STATE = /** @type {Readonly<MenuState>} */ (Object.freeze({
   closedCount: 0,
   mutedByUs: false,
-  /** Tabs in the window that are neither pinned nor in a group: what "Save this window as a group" gathers. */
   ungroupedTabs: 0,
   pinnedTabs: 0,
   incognito: false,
-});
+}));
 
+/**
+ * @param {Tab} tab - A tab.
+ * @returns {boolean} Whether it's in a tab group.
+ */
 const inGroup = (tab) => typeof tab.groupId === 'number' && tab.groupId !== -1;
 
-/** Close actions never close pinned tabs, and skip grouped tabs if the setting says so. */
+/**
+ * Close actions never close pinned tabs, and skip grouped tabs if the setting says so.
+ *
+ * @param {Tab} tab - A tab.
+ * @param {Settings} settings - The user's settings.
+ * @returns {boolean} Whether a close action may close it.
+ */
 const closable = (tab, settings) => !tab.pinned && (settings.includeGroupedTabs || !inGroup(tab));
-const ids = (tabs) => tabs.map((tab) => tab.id);
+
+/**
+ * @param {readonly Tab[]} tabs - Tabs.
+ * @returns {number[]} Their IDs. Tabs from `chrome.tabs.query` always have one; the type allows none.
+ */
+const ids = (tabs) => tabs.flatMap((tab) => tab.id ?? []);
+
+/**
+ * @param {readonly Tab[]} tabs - The tabs to close.
+ * @returns {Plan} A plan closing them.
+ */
 const close = (tabs) => ({ effect: 'close', ids: ids(tabs) });
 
-/** Whether this extension (not the user) muted the tab. */
+/**
+ * Whether this extension (not the user) muted the tab.
+ *
+ * @param {Tab} tab - A tab.
+ * @param {string} [extensionId] - This extension's id.
+ * @returns {boolean} True when it's muted, by this extension.
+ */
 const mutedByExtension = (tab, extensionId) =>
   Boolean(tab.mutedInfo?.muted) &&
-  tab.mutedInfo.reason === 'extension' &&
+  tab.mutedInfo?.reason === 'extension' &&
   tab.mutedInfo.extensionId === extensionId;
 
-/** The tabs a window's new group gathers: every tab in it that is neither pinned nor already grouped. */
+/**
+ * The tabs a window's new group gathers: every tab in it that is neither pinned nor already grouped.
+ *
+ * @param {number | undefined} windowId - The window.
+ * @param {readonly Tab[]} tabs - Every open tab.
+ * @returns {Tab[]} Those tabs, in order.
+ */
 const groupable = (windowId, tabs) =>
   tabs.filter((tab) => tab.windowId === windowId && !tab.pinned && !inGroup(tab));
 
-/** The menu state for the current tabs, the closed batch and the last focused window. */
+/**
+ * The menu state for the current tabs, the closed batch and the last focused window.
+ *
+ * @param {readonly Tab[]} tabs - Every open tab.
+ * @param {number} closedCount - Tabs in the closed batch.
+ * @param {string} extensionId - This extension's id.
+ * @param {number} [windowId] - The last focused window; none when Chrome has no window.
+ * @returns {MenuState} What the menu's labels and greyed-out items follow.
+ */
 export function menuState(tabs, closedCount, extensionId, windowId) {
   const inWindow = tabs.filter((tab) => tab.windowId === windowId);
   return {
@@ -49,9 +176,17 @@ export function menuState(tabs, closedCount, extensionId, windowId) {
 
 /**
  * A name for a new group: its main site, the one with more of its tabs than any other
- * ("github.com"), else today's date in the user's locale ("8 Nov").
+ * ("github.com"), else today's date in the user's locale ("8 Nov"). Exported for its tests.
+ *
+ * @param {readonly Pick<Tab, 'url' | 'pendingUrl'>[]} tabs - The group's tabs.
+ * @param {number} now - Today, in ms since the epoch.
+ * @param {string} [locale] - For the date; the browser's own when left out.
+ * @returns {string} The group's title.
+ * @example
+ * groupTitle([{ url: 'https://a.com/' }, { url: 'https://b.com/' }], Date.UTC(2026, 10, 8), 'en-GB'); // '8 Nov'
  */
 export function groupTitle(tabs, now, locale) {
+  /** @type {Map<string, number>} */
   const counts = new Map();
   for (const tab of tabs) {
     const key = siteKey(tabUrl(tab));
@@ -62,17 +197,38 @@ export function groupTitle(tabs, now, locale) {
   return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short' }).format(now);
 }
 
-/** Put the target window's ungrouped, unpinned tabs into one new, named group. Chrome picks the colour. */
+/**
+ * Put the target window's ungrouped, unpinned tabs into one new, named group. Chrome picks the colour.
+ *
+ * @param {Tab} target - The clicked tab.
+ * @param {readonly Tab[]} tabs - Every open tab.
+ * @param {PlanContext} ctx - The time and locale, for the name.
+ * @returns {Plan} The group plan.
+ */
 function groupWindow(target, tabs, { now, locale }) {
   const chosen = groupable(target.windowId, tabs);
   return { effect: 'group', ids: ids(chosen), title: groupTitle(chosen, now, locale) };
 }
 
-/** The tabs an action may look at: the target's window, or every window if the setting says so. */
+/**
+ * The tabs an action may look at: the target's window, or every window if the setting says so.
+ *
+ * @param {Tab} target - The clicked tab.
+ * @param {readonly Tab[]} tabs - Every open tab.
+ * @param {Settings} settings - The user's settings.
+ * @returns {readonly Tab[]} The tabs in scope.
+ */
 const inScope = (target, tabs, settings) =>
   settings.windowScope === 'all' ? tabs : tabs.filter((tab) => tab.windowId === target.windowId);
 
-/** Closable tabs on the same site as `target`. [] if not a web page. */
+/**
+ * Closable tabs on the same site as `target`.
+ *
+ * @param {Tab} target - The clicked tab.
+ * @param {readonly Tab[]} tabs - Every open tab.
+ * @param {Settings} settings - The user's settings.
+ * @returns {Tab[]} Those tabs; [] if the target isn't a web page.
+ */
 function sameSite(target, tabs, settings) {
   const key = siteKey(tabUrl(target));
   if (!key) return [];
@@ -81,18 +237,21 @@ function sameSite(target, tabs, settings) {
   );
 }
 
-/** For each page open more than once, every copy except one: the target if it's a copy, else a pinned one, else the most recently used. */
+/**
+ * For each page open more than once, every copy except one: the target if it's a copy, else a
+ * pinned one, else the most recently used.
+ *
+ * @param {Tab} target - The clicked tab.
+ * @param {readonly Tab[]} tabs - Every open tab.
+ * @param {Settings} settings - The user's settings.
+ * @returns {Tab[]} The copies to close.
+ */
 function duplicates(target, tabs, settings) {
-  const byPage = new Map();
-  for (const tab of inScope(target, tabs, settings)) {
-    const key = pageKey(tabUrl(tab));
-    if (!key) continue;
-    if (!byPage.has(key)) byPage.set(key, []);
-    byPage.get(key).push(tab);
-  }
+  const byPage = Map.groupBy(inScope(target, tabs, settings), (tab) => pageKey(tabUrl(tab)));
+  /** @type {Tab[]} */
   const result = [];
-  for (const copies of byPage.values()) {
-    if (copies.length < 2) continue;
+  for (const [key, copies] of byPage) {
+    if (key === null || copies.length < 2) continue;
     const keep =
       copies.find((tab) => tab.id === target.id) ??
       copies.find((tab) => tab.pinned) ??
@@ -102,9 +261,19 @@ function duplicates(target, tabs, settings) {
   return result;
 }
 
+/**
+ * @param {number} n - How many.
+ * @param {string} word - The singular noun.
+ * @returns {string} "1 day", "2 days".
+ */
 const plural = (n, word) => `${n} ${n === 1 ? word : `${word}s`}`;
 
-/** Stable sort by site name; non-web pages (chrome://, file://…) go last. */
+/**
+ * Stable sort by site name; non-web pages (chrome://, file://…) go last.
+ *
+ * @param {readonly Tab[]} tabs - Tabs.
+ * @returns {Tab[]} A sorted copy.
+ */
 const bySite = (tabs) =>
   [...tabs].sort((a, b) => {
     const ka = siteKey(tabUrl(a));
@@ -120,10 +289,16 @@ const bySite = (tabs) =>
  * the same group (ungrouped runs included) and each run is sorted on its own, so groups stay
  * intact. Pinned tabs don't move. Moves are applied left to right, each to its final index;
  * every move lands next to a tab from the same run, so Chrome never changes a tab's group.
+ *
+ * @param {Tab} target - The clicked tab.
+ * @param {readonly Tab[]} tabs - Every open tab.
+ * @returns {Move[]} The moves, in the order to make them.
  */
 function sortMoves(target, tabs) {
   const strip = tabs.filter((tab) => tab.windowId === target.windowId).sort((a, b) => a.index - b.index);
+  /** @type {Tab[]} */
   const desired = [];
+  /** @type {Tab[]} */
   let run = [];
   const flush = () => {
     desired.push(...(run[0]?.pinned ? run : bySite(run)));
@@ -137,9 +312,10 @@ function sortMoves(target, tabs) {
   flush();
 
   const current = strip.map((tab) => tab.id);
+  /** @type {Move[]} */
   const moves = [];
   desired.forEach((tab, index) => {
-    if (current[index] === tab.id) return;
+    if (tab.id === undefined || current[index] === tab.id) return;
     current.splice(current.indexOf(tab.id), 1);
     current.splice(index, 0, tab.id);
     moves.push({ id: tab.id, index });
@@ -149,11 +325,8 @@ function sortMoves(target, tabs) {
 
 /**
  * The actions, in menu order. `section` groups them; a separator goes between sections.
- * `title` is also the shortcut description in manifest.json; `menuTitle(settings, state)` overrides it
- * in the menu, and `enabled(state)` can grey it out (state is NO_STATE's shape).
- * `plan(target, tabs, ctx)` returns { effect: 'close' | 'mute' | 'unmute' | 'move' | 'group', ids, moves?,
- * title?, closeWindow? }.
- * `reopen: true` actions don't plan: they reopen the last closed batch.
+ *
+ * @type {readonly Action[]}
  */
 export const ACTIONS = [
   {
@@ -264,26 +437,41 @@ export const ACTIONS = [
     section: 3,
     plan: (target, tabs, ctx) => {
       const inWindow = tabs.filter((tab) => tab.windowId === target.windowId);
-      if (target.incognito || inWindow.some((tab) => tab.pinned)) return { effect: 'group', ids: [] };
+      if (target.incognito || inWindow.some((tab) => tab.pinned)) return { effect: 'group', ids: [], title: '' };
       return { ...groupWindow(target, tabs, ctx), closeWindow: true };
     },
   },
 ];
 
-const byId = new Map(ACTIONS.map((action) => [action.id, action]));
+const actionsById = new Map(ACTIONS.map((action) => [action.id, action]));
 
-/** The label an action shows in the menu. */
+/**
+ * The label an action shows in the menu.
+ *
+ * @param {Action} action - One of {@link ACTIONS}.
+ * @param {Settings} [settings] - The user's settings. Default {@link DEFAULTS}.
+ * @param {MenuState} [state] - The live state. Default {@link NO_STATE}.
+ * @returns {string} The label.
+ * @example
+ * menuTitle(inactiveAction, { ...DEFAULTS, inactiveDays: 1 }); // 'Close tabs not used in 1 day'
+ */
 export function menuTitle(action, settings = DEFAULTS, state = NO_STATE) {
   return action.menuTitle ? action.menuTitle(settings, state) : action.title;
 }
 
 /**
- * The submenu contents: visible actions in order as { id, title, enabled }, with a
- * { separator: true } entry between sections that both have visible items.
+ * The submenu contents: visible actions in order, with a separator between sections that both
+ * have visible items.
+ *
+ * @param {Settings} [settings] - The user's settings. Default {@link DEFAULTS}.
+ * @param {MenuState} [state] - The live state. Default {@link NO_STATE}.
+ * @returns {MenuEntry[]} The entries; [] when every action is hidden.
  */
 export function menuEntries(settings = DEFAULTS, state = NO_STATE) {
   const hidden = new Set(settings.hiddenActions);
+  /** @type {MenuEntry[]} */
   const entries = [];
+  /** @type {number | undefined} */
   let section;
   for (const action of ACTIONS) {
     if (hidden.has(action.id)) continue;
@@ -300,10 +488,18 @@ export function menuEntries(settings = DEFAULTS, state = NO_STATE) {
 
 /**
  * Run action `id` against `target` (or the active tab when no target is given, e.g. from a
- * keyboard shortcut). `browser` is { tabs, windows, session, tabGroups }: chrome.tabs,
- * chrome.windows, chrome.storage.session and chrome.tabGroups. `locale` is for dates in group
- * names (the browser's own when left out). Resolves to the IDs of the tabs closed, muted,
- * unmuted, moved, grouped or reopened.
+ * keyboard shortcut).
+ *
+ * @param {string} id - The action's id (a menu item or command name).
+ * @param {Tab | undefined} target - The clicked tab; the active tab when left out.
+ * @param {Browser} browser - chrome.tabs, chrome.windows, chrome.storage.session and chrome.tabGroups.
+ * @param {object} [options] - Everything else the plan needs.
+ * @param {number} [options.now] - The time. Default `Date.now()`.
+ * @param {Settings} [options.settings] - The user's settings. Default {@link DEFAULTS}.
+ * @param {string} [options.extensionId] - This extension's id, to tell its mutes from the user's.
+ * @param {string} [options.locale] - For dates in group names; the browser's own when left out.
+ * @returns {Promise<number[]>} The IDs of the tabs closed, muted, unmuted, moved, grouped or
+ *   reopened; [] for an unknown action or nothing to do.
  */
 export async function runAction(
   id,
@@ -311,32 +507,32 @@ export async function runAction(
   browser,
   { now = Date.now(), settings = DEFAULTS, extensionId, locale } = {},
 ) {
-  const action = byId.get(id);
+  const action = actionsById.get(id);
   if (!action) return [];
   if (action.reopen) return reopenClosed(browser);
 
-  if (!target) {
-    [target] = await browser.tabs.query({ active: true, lastFocusedWindow: true });
-    if (!target) return [];
-  }
+  const clicked = target ?? (await browser.tabs.query({ active: true, lastFocusedWindow: true }))[0];
+  if (!clicked) return [];
   const tabs = await browser.tabs.query({});
-  const plan = action.plan(target, tabs, { now, settings, extensionId, locale });
+  const plan = action.plan(clicked, tabs, { now, settings, extensionId, locale });
   if (!plan.ids.length) return [];
 
   if (plan.effect === 'close') {
     const chosen = new Set(plan.ids);
-    await recordClosed(browser.session, tabs.filter((tab) => chosen.has(tab.id)), now);
+    await recordClosed(browser.session, tabs.filter((tab) => tab.id !== undefined && chosen.has(tab.id)), now);
     await browser.tabs.remove(plan.ids);
   } else if (plan.effect === 'move') {
     // In order: each move assumes the ones before it have happened.
     for (const { id: tabId, index } of plan.moves) await browser.tabs.move(tabId, { index });
   } else if (plan.effect === 'group') {
+    // Not empty: checked above. Chrome's type asks for at least one id.
+    const tabIds = /** @type {[number, ...number[]]} */ (plan.ids);
     // The window is named: left out, Chrome would use the last focused window, not the clicked one.
-    const groupId = await browser.tabs.group({ tabIds: plan.ids, createProperties: { windowId: target.windowId } });
+    const groupId = await browser.tabs.group({ tabIds, createProperties: { windowId: clicked.windowId } });
     await browser.tabGroups.update(groupId, { title: plan.title });
     // Closing the window, not its tabs: Chrome deletes a saved group when its last tab is closed,
     // but keeps it when the whole window closes.
-    if (plan.closeWindow) await browser.windows.remove(target.windowId);
+    if (plan.closeWindow) await browser.windows.remove(clicked.windowId);
   } else {
     const muted = plan.effect === 'mute';
     await Promise.all(plan.ids.map((tabId) => browser.tabs.update(tabId, { muted })));

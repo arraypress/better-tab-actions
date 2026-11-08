@@ -1,3 +1,8 @@
+/**
+ * Sites and pages from tab addresses: what counts as the same site, and as the same page.
+ *
+ * @module test/sites
+ */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { siteKey, pageKey } from '../extension/shared/sites.js';

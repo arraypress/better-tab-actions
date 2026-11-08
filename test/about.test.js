@@ -1,5 +1,9 @@
-// The About card's links. The placeholder warning and repository reminder are tested in
-// @arraypress/extension-kit; here, that these links are real and the package step prints them.
+/**
+ * The About card's links. The placeholder warning and repository reminder are tested in
+ * @arraypress/extension-kit; here, that these links are real and the package step prints them.
+ *
+ * @module test/about
+ */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

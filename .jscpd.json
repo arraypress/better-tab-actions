@@ -1,0 +1,8 @@
+{
+  "path": ["extension", "test", "scripts", "store/tools"],
+  "format": ["javascript", "css"],
+  "ignore": ["**/vendor/**", "**/node_modules/**", "**/*.d.ts"],
+  "minTokens": 40,
+  "minLines": 4,
+  "mode": "weak"
+}

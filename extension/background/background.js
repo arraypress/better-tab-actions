@@ -1,16 +1,39 @@
+/**
+ * The service worker: builds the tab right-click menu, keeps its live labels up to date, runs
+ * the actions from the menu and keyboard shortcuts, tracks the recently used tabs for "Switch to
+ * last used tab", and starts the light/dark toolbar glyph.
+ *
+ * @module background/background
+ */
 import { menuEntries, menuState, runAction } from '../shared/actions.js';
 import { settingsStore } from '../shared/settings.js';
 import { closedCount } from '../shared/undo.js';
 import { forget, lastUsed, loadRecent, noteUsed, RECENT_KEY } from './recent.js';
 import { startToolbarTheme } from '../vendor/extension-kit/index.js';
 
+/** @import { MenuEntry } from '../shared/actions.js' */
+
 const PARENT_ID = 'more-tab-actions';
+/** The shortcut-only command "Switch to last used tab". */
+const SWITCH_LAST = 'switch-last-tab';
 const browser = { tabs: chrome.tabs, windows: chrome.windows, session: chrome.storage.session, tabGroups: chrome.tabGroups };
 
+/**
+ * A callback for `chrome.contextMenus.create` (it has no promise form) that logs a failure.
+ *
+ * @param {string} what - What was being done, for the message.
+ * @returns {() => void} The callback.
+ */
 const logError = (what) => () => {
   if (chrome.runtime.lastError) console.error(`${what}:`, chrome.runtime.lastError.message);
 };
 
+/**
+ * The submenu as it should look now: the settings, the open tabs, the closed batch and the
+ * focused window.
+ *
+ * @returns {Promise<MenuEntry[]>} The entries.
+ */
 async function currentMenu() {
   const [settings, tabs, count, [focused]] = await Promise.all([
     settingsStore.load(chrome.storage),
@@ -28,6 +51,7 @@ async function buildMenu() {
   const entries = await currentMenu();
   if (!entries.length) return; // Everything hidden: no menu at all.
 
+  /** @param {chrome.contextMenus.CreateProperties & {id: string}} props */
   const create = (props) =>
     chrome.contextMenus.create({ contexts: ['tab'], ...props }, logError(`Creating "${props.id}"`));
 
@@ -41,11 +65,12 @@ async function buildMenu() {
   });
 }
 
+/** @type {ReturnType<typeof setTimeout> | undefined} */
+let refreshTimer;
 /**
  * Update labels and greyed-out items that depend on live state ("Reopen 3 closed tabs", "Unmute tabs",
- * nothing left to group) without a rebuild.
+ * nothing left to group) without a rebuild. Bursts of tab events make one update.
  */
-let refreshTimer;
 function refreshMenu() {
   clearTimeout(refreshTimer);
   refreshTimer = setTimeout(async () => {
@@ -56,19 +81,27 @@ function refreshMenu() {
   }, 100);
 }
 
+/**
+ * Run an action with the stored settings.
+ *
+ * @param {string} id - The action's id.
+ * @param {chrome.tabs.Tab} [tab] - The clicked tab; the active tab when left out.
+ * @returns {Promise<number[]>} The IDs of the tabs it acted on.
+ */
 async function run(id, tab) {
   const settings = await settingsStore.load(chrome.storage);
   return runAction(id, tab, browser, { settings, extensionId: chrome.runtime.id });
 }
 // The same handler the menu and shortcuts use, for the service worker's console and the
 // Playwright check (test/e2e/groups.mjs).
-globalThis.runMenuAction = run;
+Object.assign(globalThis, { runMenuAction: run });
 
 // Listeners are registered at top level so they attach every time the service worker wakes.
 
 // Menu items persist, so build them on install/update, on startup (the closed batch is gone
 // after a restart) and when settings change. Any settings change Chrome Sync refused earlier (kept
 // on this computer) is tried again first.
+/** Retry refused settings writes, then build the menu. */
 async function startUp() {
   await settingsStore.retryUnsynced(chrome.storage).catch((error) => console.error('Retrying settings sync:', error));
   await buildMenu();
@@ -115,8 +148,14 @@ chrome.commands.onCommand.addListener((command, tab) => {
 
 // "Switch to last used tab" (shortcut only): every tab brought to the front, in any window, goes
 // to the top of the recent list. Updates are chained so quick switching can't lose one.
-const SWITCH_LAST = 'switch-last-tab';
+/** @type {Promise<void>} */
 let recentWrite = Promise.resolve();
+/**
+ * Change the recent list, after any change still being written.
+ *
+ * @param {(list: number[]) => number[]} change - The new list from the stored one.
+ * @returns {Promise<void>} Settles once written (errors are logged, not thrown).
+ */
 function updateRecent(change) {
   recentWrite = recentWrite
     .then(async () => chrome.storage.session.set({ [RECENT_KEY]: change(await loadRecent(chrome.storage.session)) }))
@@ -131,16 +170,22 @@ chrome.windows.onFocusChanged.addListener(async (windowId) => {
   if (tab) updateRecent((list) => noteUsed(list, tab.id));
 });
 
-/** Bring the last used tab (and its window) to the front. Pressed again, it comes back. */
+/**
+ * Bring the last used tab (and its window) to the front. Pressed again, it comes back.
+ *
+ * @param {chrome.tabs.Tab} [current] - The tab the shortcut was pressed on.
+ * @returns {Promise<void>}
+ */
 async function switchToLastUsed(current) {
   // Record the tab being left first: if Chrome missed a focus event, the next press still
   // comes straight back here.
   await updateRecent((list) => noteUsed(list, current?.id));
   const [list, tabs] = await Promise.all([loadRecent(chrome.storage.session), chrome.tabs.query({})]);
   const target = lastUsed(list, current?.id, tabs);
-  if (!target) return;
+  if (target?.id === undefined) return;
+  const targetId = target.id;
   await chrome.windows.update(target.windowId, { focused: true });
-  await chrome.tabs.update(target.id, { active: true });
+  await chrome.tabs.update(targetId, { active: true });
   // Switching to a tab that was already active in its window fires no onActivated: note it here.
-  await updateRecent((list) => noteUsed(list, target.id));
+  await updateRecent((list) => noteUsed(list, targetId));
 }

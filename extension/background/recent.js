@@ -5,20 +5,39 @@
  * flipping between two windows leaves it stale. This list is updated on every tab switch and
  * every window focus change instead, and kept in chrome.storage.session so it survives the
  * service worker sleeping (and is forgotten when the browser closes, like the tabs themselves).
+ *
+ * @module background/recent
  */
 
+/** @import { StorageArea } from '../vendor/extension-kit/settings/storage.js' */
+
+/** The chrome.storage.session item holding the list. */
 export const RECENT_KEY = 'recentTabs';
 
 /** Enough to step back past a few closed tabs. */
 const KEEP = 20;
 
-/** The list with `tabId` moved to the front. */
+/**
+ * The list with `tabId` moved to the front, kept to the 20 most recent.
+ *
+ * @param {number[]} list - Tab IDs, most recent first.
+ * @param {number | undefined} tabId - The tab just used; ignored unless a real tab ID.
+ * @returns {number[]} The new list (`list` itself when `tabId` is ignored).
+ * @example
+ * noteUsed([2, 1], 1); // [1, 2]
+ */
 export function noteUsed(list, tabId) {
   if (typeof tabId !== 'number' || tabId < 0) return list;
   return [tabId, ...list.filter((id) => id !== tabId)].slice(0, KEEP);
 }
 
-/** The list without a closed tab. */
+/**
+ * The list without a closed tab.
+ *
+ * @param {readonly number[]} list - Tab IDs, most recent first.
+ * @param {number} tabId - The closed tab.
+ * @returns {number[]} The new list.
+ */
 export function forget(list, tabId) {
   return list.filter((id) => id !== tabId);
 }
@@ -27,17 +46,31 @@ export function forget(list, tabId) {
  * The tab to switch to: the most recently used one that isn't `currentId` and still exists.
  * With no history yet (just installed, or the browser restarted), the open tab Chrome last
  * activated, by `lastAccessed`.
+ *
+ * @template {{id?: number, lastAccessed?: number}} T
+ * @param {readonly number[]} list - Tab IDs, most recent first.
+ * @param {number | undefined} currentId - The tab the user is on.
+ * @param {readonly T[]} tabs - Every open tab.
+ * @returns {T | null} The tab to switch to, or null when there's nowhere to go.
  */
 export function lastUsed(list, currentId, tabs) {
   const live = new Map(tabs.map((tab) => [tab.id, tab]));
   const fromList = list.find((id) => id !== currentId && live.has(id));
-  if (fromList !== undefined) return live.get(fromList);
+  if (fromList !== undefined) return live.get(fromList) ?? null;
   return tabs
     .filter((tab) => tab.id !== currentId && typeof tab.lastAccessed === 'number')
-    .reduce((best, tab) => (!best || tab.lastAccessed > best.lastAccessed ? tab : best), null);
+    .reduce(
+      (best, tab) => (!best || (tab.lastAccessed ?? 0) > (best.lastAccessed ?? 0) ? tab : best),
+      /** @type {T | null} */ (null),
+    );
 }
 
-/** Read the list from chrome.storage.session. */
+/**
+ * Read the list from chrome.storage.session.
+ *
+ * @param {StorageArea} session - `chrome.storage.session`.
+ * @returns {Promise<number[]>} The list; [] when there's none or it's not a list.
+ */
 export async function loadRecent(session) {
   const { [RECENT_KEY]: list } = await session.get([RECENT_KEY]);
   return Array.isArray(list) ? list.filter((id) => typeof id === 'number') : [];

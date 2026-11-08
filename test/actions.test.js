@@ -1,22 +1,45 @@
+/**
+ * The menu actions against the in-memory browser: what each closes, mutes, moves or reopens,
+ * the menu's labels and order, and the manifest's commands. The group actions are in
+ * groups.test.js.
+ *
+ * @module test/actions
+ */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { ACTIONS, NO_STATE, menuEntries, menuState, menuTitle, runAction } from '../extension/shared/actions.js';
+import { ACTIONS, NO_STATE, menuEntries, menuState, menuTitle } from '../extension/shared/actions.js';
 import { DEFAULTS, normalizeSettings } from '../extension/shared/settings.js';
 import { closedCount } from '../extension/shared/undo.js';
-import { fakeBrowser, EXTENSION_ID } from './fake-browser.js';
+import { fakeBrowser, runOn, tabsAt, EXTENSION_ID } from './fake-browser.js';
+
+/** @import { Action } from '../extension/shared/actions.js' */
+/** @import { Settings } from '../extension/shared/settings.js' */
 
 const DAY = 24 * 60 * 60 * 1000;
 const NOW = Date.UTC(2026, 10, 8);
 const ALL_WINDOWS = normalizeSettings({ windowScope: 'all' });
 
-/** Run an action on tab `targetId` (or the active tab if null) with the given settings. */
-const run = (b, id, targetId, settings = DEFAULTS) =>
-  runAction(id, targetId == null ? undefined : b.tab(targetId), b, {
-    now: NOW,
-    settings,
-    extensionId: EXTENSION_ID,
-  });
+/**
+ * Run an action on tab `targetId` (or the active tab if null) with the given settings.
+ *
+ * @param {ReturnType<typeof fakeBrowser>} b - The browser.
+ * @param {string} id - The action.
+ * @param {number | null} targetId - The clicked tab.
+ * @param {Settings} [settings] - Default {@link DEFAULTS}.
+ * @returns {Promise<number[]>} The tabs it acted on.
+ */
+const run = (b, id, targetId, settings = DEFAULTS) => runOn(b, id, targetId, { now: NOW, settings });
+
+/**
+ * @param {string} id - An action's id.
+ * @returns {Action} That action.
+ */
+const action = (id) => {
+  const found = ACTIONS.find((a) => a.id === id);
+  assert.ok(found, id);
+  return found;
+};
 
 // --- Close tabs from this site ---
 
@@ -160,10 +183,7 @@ test('close-tabs-to-left: closes earlier tabs in the same window, keeps pinned a
 });
 
 test('close-tabs-to-left: first tab closes nothing', async () => {
-  const b = fakeBrowser([
-    { id: 1, url: 'https://a.com/' },
-    { id: 2, url: 'https://b.com/' },
-  ]);
+  const b = fakeBrowser(tabsAt('https://a.com/', 'https://b.com/'));
   assert.deepEqual(await run(b, 'close-tabs-to-left', 1), []);
   assert.deepEqual(b.open, [1, 2]);
 });
@@ -398,10 +418,10 @@ test('menuEntries: hidden actions are left out, and no dangling separator', () =
 });
 
 test('menuTitle: inactive label follows the days setting, with correct plural', () => {
-  const inactive = ACTIONS.find((a) => a.id === 'close-inactive-tabs');
+  const inactive = action('close-inactive-tabs');
   assert.equal(menuTitle(inactive, normalizeSettings({ inactiveDays: 1 })), 'Close tabs not used in 1 day');
   assert.equal(menuTitle(inactive, normalizeSettings({ inactiveDays: 30 })), 'Close tabs not used in 30 days');
-  const reopen = ACTIONS.find((a) => a.id === 'reopen-closed-tabs');
+  const reopen = action('reopen-closed-tabs');
   assert.equal(menuTitle(reopen, DEFAULTS, { ...NO_STATE, closedCount: 1 }), 'Reopen 1 closed tab');
 });
 

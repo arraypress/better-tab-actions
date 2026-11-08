@@ -8,7 +8,8 @@ follow the user through their own Chrome Sync (plain preferences, not personal d
 receives nothing); `chrome.storage.local` only holds a write sync refused, until it's retried (by the options
 page, and by the worker at start). The options page debounces its writes (sync allows 120 a minute).
 The About card's links are in `options/about-links.js` (`githubAboutLinks`; `npm run package`
-warns loudly if one is ever a placeholder). `npm test` (node --test), `npm run package` (tests, zip, link reminders),
+warns loudly if one is ever a placeholder). `npm test` (ESLint; `tsc`, a strict check of the JSDoc types;
+node --test; and `extension-kit duplication`, which fails on copied code not listed in `.jscpd-allowlist.json`), `npm run package` (tests, zip, link reminders),
 `npm run e2e` (Playwright checks in real Chromium, `test/e2e/`: the group actions, the options page and the toolbar glyph; not part of `npm test`).
 `test/package.test.js` checks the zip is exactly `extension/` (less the SVG sources) and that every path the extension names resolves inside it.
 
