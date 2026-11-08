@@ -27,10 +27,7 @@ import { launchExtension } from '@arraypress/extension-kit/testing';
  */
 
 const extension = fileURLToPath(new URL('../../extension', import.meta.url));
-// The kit passes context options (`locale`) on to Playwright, but its type lists only `prefix`
-// and `args`.
-const launchOptions = /** @type {{prefix: string}} */ ({ prefix: 'mta-e2e-', locale: 'en-GB' });
-const { context, worker, close } = await launchExtension(chromium, extension, launchOptions);
+const { context, worker, close } = await launchExtension(chromium, extension, { prefix: 'mta-e2e-', locale: 'en-GB' });
 
 try {
   // Made-up sites, answered locally (the network edge).
