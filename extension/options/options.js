@@ -1,19 +1,39 @@
+/**
+ * The options page: which actions the menu shows, how closing works, the
+ * keyboard shortcuts that are set, and the About card. Changes show at once
+ * and are written once the clicks stop (Chrome Sync allows 120 writes a
+ * minute).
+ *
+ * @module options/options
+ */
+
+import {
+  byId, createSettingsSaver, setAboutLinks, setShortcuts, statusFlasher, valueRow, watchColorScheme,
+} from '../vendor/extension-kit/index.js';
 import { ABOUT_LINKS } from './about-links.js';
 import { ACTIONS, menuTitle } from '../shared/actions.js';
-import { changedSettings, loadSettings, normalizeSettings, settingsSaver } from '../shared/settings.js';
-import { setShortcuts } from './shortcuts.js';
-import { watchColorScheme } from '../shared/toolbar-scheme.js';
+import { normalizeSettings, settingsStore } from '../shared/settings.js';
 
-const storage = chrome.storage;
-const $ = (id) => document.getElementById(id);
+/** @import { Settings } from '../shared/settings.js' */
 
-// The toolbar glyph follows this page's light or dark scheme (toolbar-theme.js).
-watchColorScheme().catch((error) => console.debug('Reporting the colour scheme:', error));
+const windowScope = byId('windowScope', HTMLSelectElement);
+const inactiveDays = byId('inactiveDays', HTMLInputElement);
+const includeGroupedTabs = byId('includeGroupedTabs', HTMLInputElement);
 
-let settings = await loadSettings(storage);
-// Changes show at once and are written once the clicks stop (Chrome Sync allows 120 writes a minute).
-const saver = settingsSaver(storage, { onSaved: showSaved });
+// The toolbar glyph follows this page's light or dark scheme.
+watchColorScheme(chrome).catch((error) => console.debug('Reporting the colour scheme:', error));
 
+let settings = await settingsStore.load(chrome.storage);
+const flash = statusFlasher(byId('status'), 1500);
+const saver = createSettingsSaver(settingsStore, chrome.storage, { onSaved: () => flash('Saved') });
+
+/**
+ * A settings row: a label and its control.
+ *
+ * @param {string} labelText - What the row says.
+ * @param {HTMLElement} control - Its switch.
+ * @returns {HTMLLabelElement} The row.
+ */
 function row(labelText, control) {
   const label = document.createElement('label');
   label.className = 'row';
@@ -26,7 +46,7 @@ function row(labelText, control) {
 
 /** One switch per action, in menu order, all in the Menu card. */
 function renderMenuItems() {
-  const list = $('menu-items');
+  const list = byId('menu-items');
   list.replaceChildren();
   for (const action of ACTIONS) {
     const toggle = document.createElement('input');
@@ -36,7 +56,8 @@ function renderMenuItems() {
     toggle.checked = !settings.hiddenActions.includes(action.id);
     toggle.addEventListener('change', () => {
       const hidden = new Set(settings.hiddenActions);
-      toggle.checked ? hidden.delete(action.id) : hidden.add(action.id);
+      if (toggle.checked) hidden.delete(action.id);
+      else hidden.add(action.id);
       save({ hiddenActions: [...hidden] });
     });
     list.append(row(menuTitle(action, settings), toggle));
@@ -51,50 +72,35 @@ function renderMenuItems() {
 async function renderShortcuts() {
   // "Switch to last used tab" is a shortcut only (no menu item), listed first like on Chrome's page.
   const shortcuts = setShortcuts([{ id: 'switch-last-tab', title: 'Switch to last used tab' }, ...ACTIONS], await chrome.commands.getAll());
-  $('shortcuts').replaceChildren(...shortcuts.map(({ title, shortcut }) => {
-    const div = document.createElement('div');
-    div.className = 'row';
-    const text = document.createElement('span');
-    text.className = 'label';
-    text.textContent = title;
-    const key = document.createElement('span');
-    key.className = 'row-value';
-    key.textContent = shortcut;
-    div.append(text, key);
-    return div;
-  }));
-  $('edit-shortcuts').classList.toggle('first', shortcuts.length === 0);
-  $('no-shortcuts').hidden = shortcuts.length > 0;
+  byId('shortcuts').replaceChildren(...shortcuts.map(({ title, shortcut }) => valueRow(title, shortcut)));
+  byId('edit-shortcuts').classList.toggle('first', shortcuts.length === 0);
+  byId('no-shortcuts').hidden = shortcuts.length > 0;
 }
 
-let statusTimer;
+/**
+ * Apply `changes` here at once, and queue them for storage.
+ *
+ * @param {Partial<Record<keyof Settings, unknown>>} changes - Raw values; normalised on the way.
+ */
 function save(changes) {
   settings = normalizeSettings({ ...settings, ...changes });
-  saver.save(changes);
+  saver.save(/** @type {Partial<Settings>} */ (changes));
   renderMenuItems(); // Titles can depend on settings (e.g. the number of days).
 }
 
-function showSaved() {
-  const status = $('status');
-  status.textContent = 'Saved';
-  status.classList.add('show');
-  clearTimeout(statusTimer);
-  statusTimer = setTimeout(() => status.classList.remove('show'), 1500);
-}
-
 function renderForm() {
-  $('windowScope').value = settings.windowScope;
-  $('inactiveDays').value = settings.inactiveDays;
-  $('includeGroupedTabs').checked = settings.includeGroupedTabs;
+  windowScope.value = settings.windowScope;
+  inactiveDays.value = String(settings.inactiveDays);
+  includeGroupedTabs.checked = settings.includeGroupedTabs;
 }
 
-$('windowScope').addEventListener('change', (e) => save({ windowScope: e.target.value }));
-$('includeGroupedTabs').addEventListener('change', (e) => save({ includeGroupedTabs: e.target.checked }));
-$('inactiveDays').addEventListener('change', (e) => {
-  save({ inactiveDays: e.target.value });
-  e.target.value = settings.inactiveDays; // Show the clamped value.
+windowScope.addEventListener('change', () => save({ windowScope: windowScope.value }));
+includeGroupedTabs.addEventListener('change', () => save({ includeGroupedTabs: includeGroupedTabs.checked }));
+inactiveDays.addEventListener('change', () => {
+  save({ inactiveDays: inactiveDays.value });
+  inactiveDays.value = String(settings.inactiveDays); // Show the clamped value.
 });
-$('edit-shortcuts').addEventListener('click', () => {
+byId('edit-shortcuts').addEventListener('click', () => {
   chrome.tabs.create({ url: 'chrome://extensions/shortcuts' });
 });
 
@@ -109,21 +115,16 @@ addEventListener('pagehide', () => saver.flush());
 // Settings can change without this page: from another computer, through sync, or in another tab.
 // Changes made here and not yet written stay on top.
 chrome.storage.onChanged.addListener(async (changes, area) => {
-  if (!changedSettings(changes, area).length) return;
-  settings = normalizeSettings({ ...(await loadSettings(storage)), ...saver.pending });
+  if (!settingsStore.changed(changes, area).length) return;
+  settings = normalizeSettings({ ...(await settingsStore.load(chrome.storage)), ...saver.pending });
   renderForm();
   renderMenuItems();
 });
 
-/** About card: the version Chrome loaded, and the links from about-links.js. */
-function renderAbout() {
-  $('version').textContent = `Version ${chrome.runtime.getManifest().version}`;
-  $('help').href = ABOUT_LINKS.help;
-  $('report-issue').href = ABOUT_LINKS.reportIssue;
-  $('privacy-policy').href = ABOUT_LINKS.privacyPolicy;
-}
+// About card: the version Chrome loaded, and the links from about-links.js.
+byId('version').textContent = `Version ${chrome.runtime.getManifest().version}`;
+setAboutLinks(ABOUT_LINKS);
 
 renderForm();
 renderMenuItems();
 renderShortcuts();
-renderAbout();

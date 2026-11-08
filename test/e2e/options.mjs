@@ -1,6 +1,6 @@
 /**
  * Real-browser check of the options page: loads extension/ as an unpacked extension in
- * Playwright's Chromium (Playwright 1.64 from the Tabby repo, as test/e2e/groups.mjs does) and drives
+ * Playwright's Chromium and drives
  * the real page against real chrome.storage.
  *
  *   npm run e2e
@@ -10,34 +10,16 @@
  * and the About card shows the manifest's version and the links from about-links.js.
  */
 import { chromium } from 'playwright';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import path from 'node:path';
 import assert from 'node:assert/strict';
+import { launchExtension, until } from '@arraypress/extension-kit/testing';
 import { ABOUT_LINKS } from '../../extension/options/about-links.js';
 
-const extension = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../extension');
-const tmp = await mkdtemp(path.join(tmpdir(), 'mta-e2e-'));
-const context = await chromium.launchPersistentContext(path.join(tmp, 'profile'), {
-  channel: 'chromium',
-  args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`],
-});
-
-/** Poll `fn` until it's truthy. */
-async function until(fn, what, timeout = 5000) {
-  const end = Date.now() + timeout;
-  for (;;) {
-    const value = await fn();
-    if (value) return value;
-    if (Date.now() > end) throw new Error(`Timed out waiting for ${what}`);
-    await new Promise((r) => setTimeout(r, 50));
-  }
-}
+const extension = fileURLToPath(new URL('../../extension', import.meta.url));
+const { context, worker, url, close } = await launchExtension(chromium, extension, { prefix: 'mta-e2e-' });
 
 try {
-  const worker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker');
-  const extensionId = new URL(worker.url()).host;
   // Local holds only what's this computer's: the toolbar glyph's scheme (toolbar-theme.js) aside, nothing.
   const stored = () => worker.evaluate(async () => {
     const { toolbarDark, ...local } = await chrome.storage.local.get(null);
@@ -49,7 +31,7 @@ try {
   });
   const open = async () => {
     const page = await context.newPage();
-    await page.goto(`chrome-extension://${extensionId}/options/options.html`);
+    await page.goto(url('options/options.html'));
     await page.waitForFunction(() => document.getElementById('menu-items').children.length);
     return page;
   };
@@ -60,7 +42,7 @@ try {
     const text = await page.locator('main').innerText();
     assert.equal(await page.locator('#syncSettings').count(), 0);
     assert.doesNotMatch(text, /Sync settings/);
-    const { version } = JSON.parse(await readFile(path.join(extension, 'manifest.json'), 'utf8'));
+    const { version } = JSON.parse(await readFile(new URL('../../extension/manifest.json', import.meta.url), 'utf8'));
     assert.equal(await page.locator('#version').innerText(), `Version ${version}`);
     assert.match(text, /About More Tab Actions\s+More Tab Actions\s+Version [\d.]+\s+Get help with More Tab Actions\s+Report an issue\s+Privacy policy\s*$/);
     assert.equal(await page.locator('#help').getAttribute('href'), ABOUT_LINKS.help);
@@ -102,6 +84,5 @@ try {
     console.log('✔ a change still waiting is written as the page closes');
   }
 } finally {
-  await context.close();
-  await rm(tmp, { recursive: true, force: true });
+  await close();
 }

@@ -4,19 +4,30 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "postinstall": "extension-kit vendor extension/vendor/extension-kit",
     "test": "node --test test/*.js",
+    "lint": "eslint .",
+    "typecheck": "tsc -p .",
+    "duplication": "extension-kit duplication",
     "e2e": "node test/e2e/groups.mjs && node test/e2e/options.mjs && node test/e2e/toolbar.mjs",
     "toolbar-icons": "node scripts/toolbar-icons.mjs",
-    "check-ui": "node scripts/check-ui.mjs",
-    "package": "npm test && npm run check-ui && node scripts/package.mjs && node scripts/warn-placeholder-links.mjs"
+    "package": "npm test && node scripts/package.mjs"
   },
-  "description": "Adds more actions to Chrome’s tab right-click menu.",
+  "description": "Adds more actions to Chrome\u2019s tab right-click menu.",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/arraypress/more-tab-actions.git"
   },
   "devDependencies": {
-    "playwright": "1.64.0"
+    "@arraypress/extension-kit": "file:../Core/extension-kit",
+    "@eslint/js": "^10.0.1",
+    "@types/chrome": "^0.3.7",
+    "@types/node": "^26.6.6",
+    "eslint": "^10.14.0",
+    "globals": "^17.14.0",
+    "jscpd": "^5.4.3",
+    "playwright": "1.64.0",
+    "typescript": "^7.0.2"
   }
 }

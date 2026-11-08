@@ -87,17 +87,18 @@ more-tab-actions/
 ├── extension/                  the extension: load this folder, zip its contents
 │   ├── manifest.json
 │   ├── background/             the service worker: background.js (menu, shortcuts, running
-│   │                           actions), recent.js, migrate.js, toolbar-theme.js
+│   │                           actions), recent.js
 │   ├── offscreen/              offscreen.html/.js: tells the worker Chrome's light or dark mode
 │   ├── options/                the settings page, styled like chrome://settings: options.html/
-│   │                           .css/.js, about-links.js, shortcuts.js
+│   │                           .css/.js, about-links.js
 │   ├── shared/                 loaded by the worker and the pages: actions.js (what each action
-│   │                           does), settings.js, sites.js, undo.js, toolbar-scheme.js,
-│   │                           chrome-ui.css (the shared design kit's copy)
+│   │                           does), settings.js, sites.js, undo.js
+│   ├── vendor/extension-kit/   @arraypress/extension-kit's browser half, copied in by npm install
+│   │                           (not committed): chrome-ui.css, the settings store, the toolbar glyph
 │   └── icons/                  the extension icons, and toolbar/ (the light and dark glyph)
 ├── test/                       unit tests (node --test, against a fake browser), and e2e/
 │                               (Playwright checks in real Chromium)
-├── scripts/                    packaging, toolbar icon rendering, kit check, placeholder warning
+├── scripts/                    packaging and toolbar icon rendering
 ├── store/                      Chrome Web Store screenshots and promo tile, and tools/ that make them
 └── docs/
     └── bug-report/             a write-up of a Chrome bug (separators are dropped in tab menu submenus)

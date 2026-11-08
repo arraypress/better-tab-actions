@@ -1,9 +1,8 @@
 import { menuEntries, menuState, runAction } from '../shared/actions.js';
-import { changedSettings, loadSettings } from '../shared/settings.js';
+import { settingsStore } from '../shared/settings.js';
 import { closedCount } from '../shared/undo.js';
 import { forget, lastUsed, loadRecent, noteUsed, RECENT_KEY } from './recent.js';
-import { moveSettingsToSync } from './migrate.js';
-import { createToolbarTheme, watchFromOffscreen } from './toolbar-theme.js';
+import { startToolbarTheme } from '../vendor/extension-kit/index.js';
 
 const PARENT_ID = 'more-tab-actions';
 const browser = { tabs: chrome.tabs, windows: chrome.windows, session: chrome.storage.session, tabGroups: chrome.tabGroups };
@@ -14,7 +13,7 @@ const logError = (what) => () => {
 
 async function currentMenu() {
   const [settings, tabs, count, [focused]] = await Promise.all([
-    loadSettings(chrome.storage),
+    settingsStore.load(chrome.storage),
     chrome.tabs.query({}),
     closedCount(chrome.storage.session),
     // The group items describe the window the user is in: a right-click lands there.
@@ -58,7 +57,7 @@ function refreshMenu() {
 }
 
 async function run(id, tab) {
-  const settings = await loadSettings(chrome.storage);
+  const settings = await settingsStore.load(chrome.storage);
   return runAction(id, tab, browser, { settings, extensionId: chrome.runtime.id });
 }
 // The same handler the menu and shortcuts use, for the service worker's console and the
@@ -68,17 +67,17 @@ globalThis.runMenuAction = run;
 // Listeners are registered at top level so they attach every time the service worker wakes.
 
 // Menu items persist, so build them on install/update, on startup (the closed batch is gone
-// after a restart) and when settings change. Settings live in Chrome Sync (settings.js); older
-// installs' are moved there first, and anything sync refused earlier is tried again.
+// after a restart) and when settings change. Any settings change Chrome Sync refused earlier (kept
+// on this computer) is tried again first.
 async function startUp() {
-  await moveSettingsToSync(chrome.storage).catch((error) => console.error('Moving settings to sync:', error));
+  await settingsStore.retryUnsynced(chrome.storage).catch((error) => console.error('Retrying settings sync:', error));
   await buildMenu();
 }
 chrome.runtime.onInstalled.addListener(startUp);
 chrome.runtime.onStartup.addListener(startUp);
 // Settings changed here, in another tab or on another computer (through Chrome Sync).
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (changedSettings(changes, area).length) buildMenu();
+  if (settingsStore.changed(changes, area).length) buildMenu();
   if (area === 'session') refreshMenu();
 });
 
@@ -103,16 +102,10 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 // Toolbar icon: open the settings page.
 chrome.action.onClicked.addListener(() => chrome.runtime.openOptionsPage());
 
-// The toolbar glyph follows light and dark mode (toolbar-theme.js). Every start: Chrome shows the
-// manifest's light glyph after a restart or re-enable, and closes the offscreen watcher on quit.
-const toolbarTheme = createToolbarTheme({ storage: chrome.storage.local, action: chrome.action, extensionId: chrome.runtime.id });
-toolbarTheme.restore();
-watchFromOffscreen({ offscreen: chrome.offscreen, runtime: chrome.runtime })
-  .catch((error) => console.error('Opening the colour scheme watcher:', error));
-chrome.runtime.onMessage.addListener((message, sender) => {
-  toolbarTheme.onMessage(message, sender);
-  return false;
-});
+// The toolbar glyph follows light and dark mode, reported by the options page and an offscreen
+// watcher. Every start: Chrome shows the manifest's light glyph after a restart or re-enable, and
+// closes the offscreen watcher on quit.
+startToolbarTheme(chrome);
 
 // Keyboard shortcuts (command names match action IDs): act on the active tab.
 chrome.commands.onCommand.addListener((command, tab) => {

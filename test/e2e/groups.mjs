@@ -1,7 +1,6 @@
 /**
  * Real-browser check of the two group actions: loads extension/ as an unpacked extension in
- * Playwright's Chromium (Playwright 1.64 from the Tabby repo, as store/tools/make-screenshots.mjs
- * does) and runs the actions through the background's own handler (`runMenuAction`, what the menu
+ * Playwright's Chromium and runs the actions through the background's own handler (`runMenuAction`, what the menu
  * and shortcuts call), so the real chrome.tabs / chrome.tabGroups / chrome.windows do the work.
  *
  *   npm run e2e
@@ -11,26 +10,18 @@
  * closes" rests on Chromium's source (see actions.js) and a check by hand in real Chrome.
  */
 import { chromium } from 'playwright';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import path from 'node:path';
 import assert from 'node:assert/strict';
+import { launchExtension } from '@arraypress/extension-kit/testing';
 
-const extension = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../extension');
-const tmp = await mkdtemp(path.join(tmpdir(), 'mta-e2e-'));
-const context = await chromium.launchPersistentContext(path.join(tmp, 'profile'), {
-  channel: 'chromium',
-  locale: 'en-GB',
-  args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`],
-});
+const extension = fileURLToPath(new URL('../../extension', import.meta.url));
+const { context, worker, close } = await launchExtension(chromium, extension, { prefix: 'mta-e2e-', locale: 'en-GB' });
 
 try {
   // Made-up sites, answered locally (the network edge).
   await context.route('https://*.example/**', (route) =>
     route.fulfill({ contentType: 'text/html', body: `<title>${new URL(route.request().url()).hostname}</title>` }));
 
-  const worker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker');
   const inWorker = (fn, arg) => worker.evaluate(fn, arg);
 
   /** Open a window with these tabs (`pin` = indexes to pin) and wait for them to load. */
@@ -100,6 +91,5 @@ try {
     console.log('– not checkable here: that Chrome lists it in saved groups (no API exposes them)');
   }
 } finally {
-  await context.close();
-  await rm(tmp, { recursive: true, force: true });
+  await close();
 }

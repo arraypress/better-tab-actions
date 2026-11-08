@@ -2,3 +2,4 @@ node_modules/
 release/
 .test-builds/
 .DS_Store
+extension/vendor/

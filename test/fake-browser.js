@@ -1,99 +1,14 @@
 /**
  * In-memory stand-in for the browser edge: chrome.tabs, chrome.windows, chrome.tabGroups and
- * chrome.storage.session. Holds real state (window membership, tab order, groups, saved groups,
- * mute) so tests check outcomes, not calls.
+ * chrome.storage.session (@arraypress/extension-kit's fake storage). Holds real state (window
+ * membership, tab order, groups, saved groups, mute) so tests check outcomes, not calls.
+ *
+ * @module test/fake-browser
  */
+import { fakeChromeStorage } from '@arraypress/extension-kit/testing';
+
+/** The id the fake's own extension has. */
 export const EXTENSION_ID = 'test-extension-id';
-
-export function fakeStorage(initial = {}) {
-  const data = structuredClone(initial);
-  return {
-    data,
-    async get(keys) {
-      return Object.fromEntries(keys.filter((k) => k in data).map((k) => [k, structuredClone(data[k])]));
-    },
-    async set(items) {
-      Object.assign(data, structuredClone(items));
-    },
-    async remove(key) {
-      for (const k of [key].flat()) delete data[k];
-    },
-  };
-}
-
-/**
- * chrome.storage with local and sync areas and onChanged, behaving as Chrome does: values are
- * stored as JSON, onChanged fires only for values that changed, and sync refuses an item over
- * its 8,192-byte quota and more than 120 writes (set or remove) a minute, by `now()`.
- * `sync.writes` counts the writes it took. `settled()` waits for every listener, including the
- * changes those listeners make.
- */
-export function fakeChromeStorage({ local = {}, sync = {}, now = Date.now } = {}) {
-  const listeners = [];
-  const running = [];
-  const json = (value) => (value === undefined ? undefined : JSON.parse(JSON.stringify(value)));
-
-  function area(name, initial, { quotaPerItem, writesPerMinute } = {}) {
-    const data = json(initial);
-    const recent = [];
-    const fire = (changes) => {
-      if (!Object.keys(changes).length) return;
-      for (const listener of listeners) running.push(listener(json(changes), name));
-    };
-    return {
-      data,
-      writes: 0,
-      /** A write, counted against the per-minute limit; refused over it, as Chrome does. */
-      take() {
-        if (!writesPerMinute) return void this.writes++;
-        while (recent.length && recent[0] <= now() - 60_000) recent.shift();
-        if (recent.length >= writesPerMinute) {
-          throw new Error('This request exceeds the MAX_WRITE_OPERATIONS_PER_MINUTE quota.');
-        }
-        recent.push(now());
-        this.writes++;
-      },
-      async get(keys) {
-        const wanted = keys == null ? Object.keys(data) : [keys].flat();
-        return Object.fromEntries(wanted.filter((k) => k in data).map((k) => [k, json(data[k])]));
-      },
-      async set(items) {
-        for (const [key, value] of Object.entries(items)) {
-          if (quotaPerItem && key.length + JSON.stringify(value).length > quotaPerItem) {
-            throw new Error('Resource::kQuotaBytesPerItem quota exceeded');
-          }
-        }
-        this.take();
-        const changes = {};
-        for (const [key, value] of Object.entries(items)) {
-          if (JSON.stringify(data[key]) === JSON.stringify(value)) continue;
-          changes[key] = { oldValue: data[key], newValue: json(value) };
-          data[key] = json(value);
-        }
-        fire(changes);
-      },
-      async remove(keys) {
-        this.take();
-        const changes = {};
-        for (const key of [keys].flat()) {
-          if (!(key in data)) continue;
-          changes[key] = { oldValue: data[key] };
-          delete data[key];
-        }
-        fire(changes);
-      },
-    };
-  }
-
-  return {
-    local: area('local', local),
-    sync: area('sync', sync, { quotaPerItem: 8192, writesPerMinute: 120 }),
-    onChanged: { addListener: (listener) => listeners.push(listener) },
-    async settled() {
-      while (running.length) await Promise.all(running.splice(0));
-    },
-  };
-}
 
 /** The colours Chrome cycles through for new groups (chrome.tabGroups.Color). */
 const GROUP_COLORS = ['grey', 'blue', 'red', 'yellow', 'green', 'pink', 'purple', 'cyan', 'orange'];
@@ -274,7 +189,7 @@ export function fakeBrowser(initialTabs, { focusedWindowId = 1 } = {}) {
     tabs: tabsApi,
     windows: windowsApi,
     tabGroups: tabGroupsApi,
-    session: fakeStorage(),
+    session: fakeChromeStorage().session,
 
     /** A tab as Chrome would pass it to a menu click. */
     tab: (id) => snapshot().find((t) => t.id === id),
