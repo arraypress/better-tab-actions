@@ -1,8 +1,8 @@
 import { ABOUT_LINKS } from './about-links.js';
-import { ACTIONS, menuTitle } from './actions.js';
-import { changedSettings, loadSettings, normalizeSettings, settingsSaver } from './settings.js';
+import { ACTIONS, menuTitle } from '../shared/actions.js';
+import { changedSettings, loadSettings, normalizeSettings, settingsSaver } from '../shared/settings.js';
 import { setShortcuts } from './shortcuts.js';
-import { watchColorScheme } from './toolbar-scheme.js';
+import { watchColorScheme } from '../shared/toolbar-scheme.js';
 
 const storage = chrome.storage;
 const $ = (id) => document.getElementById(id);

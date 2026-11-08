@@ -1,14 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
-import { createToolbarTheme, OFFSCREEN_PATH, toolbarIcon, watchFromOffscreen } from '../toolbar-theme.js';
-import { reportColorScheme, TOOLBAR_DARK_KEY, TOOLBAR_SCHEME } from '../toolbar-scheme.js';
-import { loadSettings, saveSettings, DEFAULTS } from '../settings.js';
-import { moveSettingsToSync } from '../migrate.js';
+import { createToolbarTheme, OFFSCREEN_PATH, toolbarIcon, watchFromOffscreen } from '../extension/background/toolbar-theme.js';
+import { reportColorScheme, TOOLBAR_DARK_KEY, TOOLBAR_SCHEME } from '../extension/shared/toolbar-scheme.js';
+import { loadSettings, saveSettings, DEFAULTS } from '../extension/shared/settings.js';
+import { moveSettingsToSync } from '../extension/background/migrate.js';
 import { EXTENSION_ID, fakeChromeStorage } from './fake-browser.js';
 
 const self = { id: EXTENSION_ID };
-const root = new URL('../', import.meta.url);
+const root = new URL('../extension/', import.meta.url);
 const read = (file) => readFileSync(new URL(file, root), 'utf8');
 
 /** chrome.action as far as this goes: it remembers the icons it was given. */
@@ -99,7 +99,7 @@ test('toolbar: the offscreen document polls, as no change event reaches a page t
   check();
   check();
   assert.deepEqual(sent, [false, true]);
-  assert.match(read('offscreen.js'), /setInterval\(check, POLL_MS\)/);
+  assert.match(read('offscreen/offscreen.js'), /setInterval\(check, POLL_MS\)/);
 });
 
 test('toolbar: the offscreen watcher opens once, for MATCH_MEDIA, even when asked twice at once', async () => {
@@ -130,9 +130,11 @@ test('toolbar: manifest starts on the light glyph, keeps its brand icons, asks f
   for (const file of [...Object.values(toolbarIcon(false)), ...Object.values(toolbarIcon(true))]) {
     assert.ok(existsSync(new URL(file.slice(1), root)), file);
   }
-  const zip = JSON.parse(read('package.json')).scripts.package;
-  for (const file of ['toolbar-scheme.js', 'toolbar-theme.js', OFFSCREEN_PATH, 'offscreen.js']) assert.match(zip, new RegExp(` ${file} `), file);
-  assert.match(read('options.js'), /watchColorScheme\(\)/);
+  // Everything under extension/ ships (test/package.test.js); OFFSCREEN_PATH is from the extension's root.
+  for (const file of ['shared/toolbar-scheme.js', 'background/toolbar-theme.js', OFFSCREEN_PATH, 'offscreen/offscreen.js']) {
+    assert.ok(existsSync(new URL(file, root)), file);
+  }
+  assert.match(read('options/options.js'), /watchColorScheme\(\)/);
 });
 
 test('toolbarDark: this computer’s, never synced (saving, loading and the move to sync leave it in local)', async () => {
@@ -143,5 +145,5 @@ test('toolbarDark: this computer’s, never synced (saving, loading and the move
   assert.equal(storage.local.data[TOOLBAR_DARK_KEY], true);
   assert.deepEqual(await loadSettings(storage), { ...DEFAULTS, inactiveDays: 21, windowScope: 'all' });
   // Nothing settings-shaped mentions it either.
-  assert.doesNotMatch(read('settings.js'), /toolbarDark/);
+  assert.doesNotMatch(read('shared/settings.js'), /toolbarDark/);
 });

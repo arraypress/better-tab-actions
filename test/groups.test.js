@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { menuEntries, menuState, runAction, groupTitle } from '../actions.js';
-import { DEFAULTS } from '../settings.js';
-import { closedCount } from '../undo.js';
+import { menuEntries, menuState, runAction, groupTitle } from '../extension/shared/actions.js';
+import { DEFAULTS } from '../extension/shared/settings.js';
+import { closedCount } from '../extension/shared/undo.js';
 import { fakeBrowser, EXTENSION_ID } from './fake-browser.js';
 
 const NOW = Date.UTC(2026, 10, 8, 12);

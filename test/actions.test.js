@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { ACTIONS, NO_STATE, menuEntries, menuState, menuTitle, runAction } from '../actions.js';
-import { DEFAULTS, normalizeSettings } from '../settings.js';
-import { closedCount } from '../undo.js';
+import { ACTIONS, NO_STATE, menuEntries, menuState, menuTitle, runAction } from '../extension/shared/actions.js';
+import { DEFAULTS, normalizeSettings } from '../extension/shared/settings.js';
+import { closedCount } from '../extension/shared/undo.js';
 import { fakeBrowser, EXTENSION_ID } from './fake-browser.js';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -407,7 +407,7 @@ test('menuTitle: inactive label follows the days setting, with correct plural', 
 
 // --- Manifest ---
 
-const manifest = JSON.parse(readFileSync(new URL('../manifest.json', import.meta.url), 'utf8'));
+const manifest = JSON.parse(readFileSync(new URL('../extension/manifest.json', import.meta.url), 'utf8'));
 
 test('manifest: every action has a matching command, plus the shortcut-only "switch to last used tab"', () => {
   const commands = manifest.commands;
@@ -423,16 +423,4 @@ test('manifest: every action has a matching command, plus the shortcut-only "swi
 test('manifest: within Chrome Web Store limits', () => {
   assert.ok(manifest.name.length <= 75);
   assert.ok(manifest.description.length <= 132, `description is ${manifest.description.length} chars`);
-});
-
-test('package script ships every module the extension imports', () => {
-  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
-  const shipped = pkg.scripts.package.split(' ');
-  for (const file of ['background.js', 'options.js', 'actions.js', 'settings.js', 'migrate.js', 'about-links.js', 'sites.js', 'undo.js']) {
-    const src = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
-    for (const [, dep] of src.matchAll(/from '\.\/([\w-]+\.js)'/g)) {
-      assert.ok(shipped.includes(dep), `${file} imports ${dep}, which the package script leaves out`);
-    }
-    assert.ok(shipped.includes(file), `${file} is missing from the package script`);
-  }
 });

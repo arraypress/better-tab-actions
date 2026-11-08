@@ -12,7 +12,7 @@
  * comes next; this computer's local copy fills whatever is left. Old copies are removed only
  * after their values are safely written (or held for sync by writeSynced), so nothing is lost.
  */
-import { DEFAULTS, LOCAL_KEYS, SYNCED_KEYS, normalizeSettings, writeSynced } from './settings.js';
+import { DEFAULTS, LOCAL_KEYS, SYNCED_KEYS, normalizeSettings, writeSynced } from '../shared/settings.js';
 
 /** In chrome.storage.local: the old opt-in switch. */
 export const OLD_SWITCH = 'syncSettings';

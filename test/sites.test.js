@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { siteKey, pageKey } from '../sites.js';
+import { siteKey, pageKey } from '../extension/shared/sites.js';
 
 test('siteKey treats www and bare domain as the same site', () => {
   assert.equal(siteKey('https://www.example.com/a'), 'example.com');

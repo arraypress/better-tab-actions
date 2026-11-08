@@ -1,5 +1,5 @@
 /**
- * Real-browser check of the two group actions: loads this folder as an unpacked extension in
+ * Real-browser check of the two group actions: loads extension/ as an unpacked extension in
  * Playwright's Chromium (Playwright 1.64 from the Tabby repo, as store/tools/make-screenshots.mjs
  * does) and runs the actions through the background's own handler (`runMenuAction`, what the menu
  * and shortcuts call), so the real chrome.tabs / chrome.tabGroups / chrome.windows do the work.
@@ -17,12 +17,12 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 
-const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+const extension = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../extension');
 const tmp = await mkdtemp(path.join(tmpdir(), 'mta-e2e-'));
 const context = await chromium.launchPersistentContext(path.join(tmp, 'profile'), {
   channel: 'chromium',
   locale: 'en-GB',
-  args: [`--disable-extensions-except=${root}`, `--load-extension=${root}`],
+  args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`],
 });
 
 try {

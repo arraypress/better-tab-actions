@@ -4,7 +4,7 @@
 
 Single source of truth for the Developer Dashboard. Update it in the same change as anything
 that alters the listing, permissions, data handling or version. Not shipped: `npm run package`
-zips only the files listed in `package.json` (into `release/more-tab-actions.zip`), so this file
+zips only the contents of `extension/` (into `release/more-tab-actions.zip`), so this file
 and `store/` never reach the store.
 
 ## Store Listing
@@ -68,7 +68,7 @@ English.
 
 | Asset | Dimensions | Status | Filename |
 |-------|-----------|--------|----------|
-| Store Icon [REQUIRED] | 128×128 PNG | ✅ Ready | `icons/icon-128.png` |
+| Store Icon [REQUIRED] | 128×128 PNG | ✅ Ready | `extension/icons/icon-128.png` |
 | Screenshot 1 [REQUIRED] | 1280×800 | ✅ Ready | `store/screenshot-1.png`: “Close every tab from this site”, the tab menu with the submenu open (all ten items, the group ones included) |
 | Screenshot 2 | 1280×800 | ✅ Ready | `store/screenshot-2.png`: “Close duplicate tabs, keep one of each”, the tab strip before and after |
 | Screenshot 3 | 1280×800 | ✅ Ready | `store/screenshot-3.png`: “Mute every other tab”, the menu over tabs playing sound |
@@ -77,14 +77,14 @@ English.
 | Small Promo Tile [RECOMMENDED] | 440×280 | ✅ Ready | `store/promo-440x280.png`: icon, name, “More from your tab menu” |
 | Marquee Promo Tile [OPTIONAL] | 1400×560 | ⬜ Not made | Only used if the store features the extension |
 
-**How they were made.** `node store/tools/make-screenshots.mjs` regenerates all six. It loads this
-folder as an unpacked extension in Playwright's Chromium (Playwright 1.64.0 from the Tabby repo).
+**How they were made.** `node store/tools/make-screenshots.mjs` regenerates all six. It loads
+`extension/` as an unpacked extension in Playwright's Chromium (Playwright 1.64.0 from the Tabby repo).
 - The settings pages (4, 5) are real captures, at 1.2 like the others (shot 2 at 1). The script stops if shot 5’s Keyboard shortcuts card no longer fits.
-- Screenshot 2's tab lists are real: the script opens the tabs, runs the build's own “Close duplicate tabs” (`actions.js` `runAction`, as `background.js` does) and draws the strip from `chrome.tabs` before and after.
+- Screenshot 2's tab lists are real: the script opens the tabs, runs the build's own “Close duplicate tabs” (`extension/shared/actions.js` `runAction`, as `extension/background/background.js` does) and draws the strip from `chrome.tabs` before and after.
 - Chrome's tab right-click menu is native, so it can't be captured headlessly; shots 1 and 3 draw it.
   - Its items and order come from Chromium's `tab_menu_model.cc` at tag 157.0.8103.39. They use the macOS Title Case strings, for a signed-out profile with one window and no tab groups.
   - The submenu's labels come from the build's `menuEntries()`.
-  - The submenu has **no separator** because Chrome 157 drops separators in tab-menu submenus (`bug-report/report.md`), so this is what users see today.
+  - The submenu has **no separator** because Chrome 157 drops separators in tab-menu submenus (`docs/bug-report/report.md`), so this is what users see today.
   - Re-check these two shots if Chrome changes the tab menu.
 - The web pages behind the menus are made up (no real sites). Photos are CC0, from Wikimedia Commons: “Bierstadt Lake Trail, Rocky Mountain National Park, 2009”, “Lake Mountain Landscape”, “Lighthouse Chania evening sun”.
 
@@ -102,7 +102,7 @@ folder as an unpacked extension in Playwright's Chromium (Playwright 1.64.0 from
 | `storage` | `chrome.storage.sync` keeps the user’s settings (hidden actions, days, windows, grouped tabs), so Chrome Sync carries them to the user’s other computers through their own Google account, like Chrome’s own settings (signed out of Chrome, they stay on the computer). `chrome.storage.local` only holds a settings change Chrome Sync refused for the moment, until it’s retried, and whether Chrome was last seen in light or dark mode (`toolbarDark`, one true/false, this computer only, never synced), for the toolbar icon. `chrome.storage.session` remembers the addresses of the last batch of tabs an action closed, so “Reopen closed tabs” can bring them back. Chrome clears that when it quits. Nothing is sent to the developer. No install warning. |
 | `commands` (manifest key) | Keyboard shortcuts for the same actions, plus “Switch to last used tab”; two have defaults (Close tabs from this site, Alt+Shift+W; Switch to last used tab, Alt+Shift+Z). Users change them at chrome://extensions/shortcuts. The two group actions have commands with no default key. No install warning. |
 | `action` (manifest key, not a permission) | The toolbar button opens the settings page. Its icon is a plain glyph in Chrome’s own toolbar icon colours, light or dark to match Chrome. |
-| `offscreen` | Keeps one small hidden page (`offscreen.html`, reason `MATCH_MEDIA`) that reads whether Chrome is in light or dark mode (`matchMedia('(prefers-color-scheme: dark)')`, which the service worker can’t call), so the toolbar icon matches Chrome’s own icons. It only reads that one true/false and tells the extension’s service worker when it changes; it loads nothing and sends nothing anywhere. No install warning. |
+| `offscreen` | Keeps one small hidden page (`offscreen/offscreen.html`, reason `MATCH_MEDIA`) that reads whether Chrome is in light or dark mode (`matchMedia('(prefers-color-scheme: dark)')`, which the service worker can’t call), so the toolbar icon matches Chrome’s own icons. It only reads that one true/false and tells the extension’s service worker when it changes; it loads nothing and sends nothing anywhere. No install warning. |
 
 No host permissions, no content scripts, no `scripting`.
 
@@ -159,15 +159,15 @@ repo must be public first). The text is `PRIVACY.md`; the draft below is the sam
 - [ ] Decide the **support** contact (email or URL) and whether to add a homepage URL.
 
 **Build:**
-- [ ] `npm run package` (tests, kit check, zip). Check the zip holds only the extension:
-      `unzip -l release/more-tab-actions.zip` should list manifest.json, background.js, actions.js, settings.js, migrate.js, about-links.js, sites.js, undo.js, recent.js, shortcuts.js, options.html, chrome-ui.css, options.css, options.js and icons/ (19 entries, no `store/`, `test/`, `scripts/` or `bug-report/`).
-- [ ] **No placeholder links.** `about-links.js` points at the GitHub repo (README, Issues, PRIVACY.md); `npm run package` warns loudly if any link is ever set back to example.com.
-- [ ] Load the folder in a clean profile and right-click a tab: the submenu, a shortcut and the settings page all work.
+- [ ] `npm run package` (tests, kit check, zip). The zip is exactly the contents of `extension/`, less the toolbar glyph's SVG sources (`test/package.test.js` checks this):
+      `unzip -l release/more-tab-actions.zip` should list 28 files: `manifest.json` at the root, then `background/` (4), `offscreen/` (2), `options/` (5), `shared/` (6) and `icons/` (10 PNGs); no `store/`, `test/`, `scripts/` or `docs/`.
+- [ ] **No placeholder links.** `extension/options/about-links.js` points at the GitHub repo (README, Issues, PRIVACY.md); `npm run package` warns loudly if any link is ever set back to example.com.
+- [ ] Load the `extension/` folder in a clean profile and right-click a tab: the submenu, a shortcut and the settings page all work.
 
 **Developer Dashboard, in order:**
 1. **Items › New item**: upload `release/more-tab-actions.zip`.
 2. **Store listing**: paste the detailed description and pick the category and language (English). Upload:
-   - store icon `icons/icon-128.png`;
+   - store icon `extension/icons/icon-128.png`;
    - screenshots `store/screenshot-1.png` … `-5.png`, in that order (1 is the one people see first);
    - small promo tile `store/promo-440x280.png`.
 

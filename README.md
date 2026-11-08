@@ -62,8 +62,8 @@ Chrome shows “Read your browsing history” (for `tabs`) and “View and manag
 Needs Chrome 150 or later (that’s when Chrome let extensions add to the tab menu).
 
 1. Download or clone this repository.
-2. Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked**, and choose this
-   folder.
+2. Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked**, and choose the
+   `extension/` folder.
 
 ## Development
 
@@ -74,12 +74,34 @@ npm run e2e          # browser tests in Playwright's Chromium
 npm run package      # tests, then release/more-tab-actions.zip for the Chrome Web Store
 ```
 
-- `actions.js`: what each action does (pure, tested against a fake browser in `test/`).
-- `background.js`: the menu, shortcuts, and running actions.
-- `options.*`: the settings page, styled like chrome://settings.
-- `store/`: Chrome Web Store screenshots and the script that makes them; listing text is in
-  `CHROMEWEBSTORE.md`.
-- `bug-report/`: a write-up of a Chrome bug (separators are dropped in tab menu submenus).
+## Layout
+
+The extension is the `extension/` folder: it's what you load in Chrome, and exactly what
+`npm run package` zips (less the toolbar glyph's SVG sources). The rest of the repo is the project
+around it.
+
+```
+more-tab-actions/
+├── README.md  LICENSE  PRIVACY.md  CHANGELOG.md  CHROMEWEBSTORE.md  CLAUDE.md
+├── package.json  package-lock.json  .gitignore
+├── extension/                  the extension: load this folder, zip its contents
+│   ├── manifest.json
+│   ├── background/             the service worker: background.js (menu, shortcuts, running
+│   │                           actions), recent.js, migrate.js, toolbar-theme.js
+│   ├── offscreen/              offscreen.html/.js: tells the worker Chrome's light or dark mode
+│   ├── options/                the settings page, styled like chrome://settings: options.html/
+│   │                           .css/.js, about-links.js, shortcuts.js
+│   ├── shared/                 loaded by the worker and the pages: actions.js (what each action
+│   │                           does), settings.js, sites.js, undo.js, toolbar-scheme.js,
+│   │                           chrome-ui.css (the shared design kit's copy)
+│   └── icons/                  the extension icons, and toolbar/ (the light and dark glyph)
+├── test/                       unit tests (node --test, against a fake browser), and e2e/
+│                               (Playwright checks in real Chromium)
+├── scripts/                    packaging, toolbar icon rendering, kit check, placeholder warning
+├── store/                      Chrome Web Store screenshots and promo tile, and tools/ that make them
+└── docs/
+    └── bug-report/             a write-up of a Chrome bug (separators are dropped in tab menu submenus)
+```
 
 ## License
 

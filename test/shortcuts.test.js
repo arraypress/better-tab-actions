@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ACTIONS } from '../actions.js';
-import { setShortcuts } from '../shortcuts.js';
+import { ACTIONS } from '../extension/shared/actions.js';
+import { setShortcuts } from '../extension/options/shortcuts.js';
 
 test('lists only the shortcuts that are set, in menu order', () => {
   const commands = ACTIONS.map((action) => ({ name: action.id, shortcut: '' }));
@@ -20,7 +20,7 @@ test('nothing set means an empty list (the page then shows only the link row)', 
 
 test('uses the action titles Chrome shows as shortcut descriptions', async () => {
   const { readFile } = await import('node:fs/promises');
-  const manifest = JSON.parse(await readFile(new URL('../manifest.json', import.meta.url), 'utf8'));
+  const manifest = JSON.parse(await readFile(new URL('../extension/manifest.json', import.meta.url), 'utf8'));
   const [first] = setShortcuts(ACTIONS, [{ name: 'close-site-tabs', shortcut: 'X' }]);
   assert.equal(first.title, manifest.commands['close-site-tabs'].description);
 });

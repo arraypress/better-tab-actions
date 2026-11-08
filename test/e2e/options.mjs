@@ -1,6 +1,6 @@
 /**
- * Real-browser check of the options page: loads this folder as an unpacked extension in
- * Playwright's Chromium (Playwright 1.64 from the Tabby repo, as e2e/groups.mjs does) and drives
+ * Real-browser check of the options page: loads extension/ as an unpacked extension in
+ * Playwright's Chromium (Playwright 1.64 from the Tabby repo, as test/e2e/groups.mjs does) and drives
  * the real page against real chrome.storage.
  *
  *   npm run e2e
@@ -15,13 +15,13 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import assert from 'node:assert/strict';
-import { ABOUT_LINKS } from '../about-links.js';
+import { ABOUT_LINKS } from '../../extension/options/about-links.js';
 
-const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+const extension = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../extension');
 const tmp = await mkdtemp(path.join(tmpdir(), 'mta-e2e-'));
 const context = await chromium.launchPersistentContext(path.join(tmp, 'profile'), {
   channel: 'chromium',
-  args: [`--disable-extensions-except=${root}`, `--load-extension=${root}`],
+  args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`],
 });
 
 /** Poll `fn` until it's truthy. */
@@ -49,7 +49,7 @@ try {
   });
   const open = async () => {
     const page = await context.newPage();
-    await page.goto(`chrome-extension://${extensionId}/options.html`);
+    await page.goto(`chrome-extension://${extensionId}/options/options.html`);
     await page.waitForFunction(() => document.getElementById('menu-items').children.length);
     return page;
   };
@@ -60,7 +60,7 @@ try {
     const text = await page.locator('main').innerText();
     assert.equal(await page.locator('#syncSettings').count(), 0);
     assert.doesNotMatch(text, /Sync settings/);
-    const { version } = JSON.parse(await readFile(path.join(root, 'manifest.json'), 'utf8'));
+    const { version } = JSON.parse(await readFile(path.join(extension, 'manifest.json'), 'utf8'));
     assert.equal(await page.locator('#version').innerText(), `Version ${version}`);
     assert.match(text, /About More Tab Actions\s+More Tab Actions\s+Version [\d.]+\s+Get help with More Tab Actions\s+Report an issue\s+Privacy policy\s*$/);
     assert.equal(await page.locator('#help').getAttribute('href'), ABOUT_LINKS.help);

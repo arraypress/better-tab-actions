@@ -1,6 +1,6 @@
-import { menuEntries, menuState, runAction } from './actions.js';
-import { changedSettings, loadSettings } from './settings.js';
-import { closedCount } from './undo.js';
+import { menuEntries, menuState, runAction } from '../shared/actions.js';
+import { changedSettings, loadSettings } from '../shared/settings.js';
+import { closedCount } from '../shared/undo.js';
 import { forget, lastUsed, loadRecent, noteUsed, RECENT_KEY } from './recent.js';
 import { moveSettingsToSync } from './migrate.js';
 import { createToolbarTheme, watchFromOffscreen } from './toolbar-theme.js';
@@ -62,7 +62,7 @@ async function run(id, tab) {
   return runAction(id, tab, browser, { settings, extensionId: chrome.runtime.id });
 }
 // The same handler the menu and shortcuts use, for the service worker's console and the
-// Playwright check (e2e/groups.mjs).
+// Playwright check (test/e2e/groups.mjs).
 globalThis.runMenuAction = run;
 
 // Listeners are registered at top level so they attach every time the service worker wakes.

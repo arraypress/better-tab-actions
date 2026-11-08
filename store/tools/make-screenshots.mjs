@@ -3,7 +3,7 @@
  *
  *   node store/tools/make-screenshots.mjs
  *
- * Loads this folder as an unpacked extension in Playwright's Chromium (Playwright 1.64.0 from the
+ * Loads extension/ as an unpacked extension in Playwright's Chromium (Playwright 1.64.0 from the
  * Tabby repo, launched the way Tabby's e2e tests do) and:
  * - captures the real options page (light and dark);
  * - opens real tabs and runs the real "Close duplicate tabs" action (actions.js runAction, as
@@ -14,7 +14,7 @@
  * (frame.mjs): Chrome 157 on macOS, items and order from Chromium's tab_menu_model.cc at tag
  * 157.0.8103.39 (Title Case strings on macOS), for a signed-out profile with one window and no
  * tab groups. The extension's submenu has no separator: Chrome drops separators in tab-menu
- * submenus (bug-report/report.md), so that's what users see today.
+ * submenus (docs/bug-report/report.md), so that's what users see today.
  *
  * Web pages in the shots are made up (no real sites); photos are CC0 from Wikimedia Commons.
  */
@@ -30,11 +30,11 @@ import {
 const ZOOMED = geometry(1.2);
 const tools = path.dirname(fileURLToPath(import.meta.url));
 const store = path.dirname(tools);
-const root = path.dirname(store);
+const extension = path.join(path.dirname(store), 'extension');
 const tmp = await mkdtemp(path.join(tmpdir(), 'mta-store-'));
 const dataUrl = async (file, type = 'image/png') => `data:${type};base64,${(await readFile(file)).toString('base64')}`;
 const photo = (name) => dataUrl(path.join(tools, 'photos', `${name}.jpg`), 'image/jpeg');
-const EXT_ICON = await dataUrl(path.join(root, 'icons', 'icon-32.png'));
+const EXT_ICON = await dataUrl(path.join(extension, 'icons', 'icon-32.png'));
 
 // ---------------------------------------------------------------- made-up sites
 
@@ -76,11 +76,11 @@ const context = await chromium.launchPersistentContext(path.join(tmp, 'profile')
   channel: 'chromium',
   viewport: geometry(1).content,
   deviceScaleFactor: 2,
-  args: [`--disable-extensions-except=${root}`, `--load-extension=${root}`],
+  args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`],
 });
 const worker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker');
 const extensionId = new URL(worker.url()).host;
-const optionsUrl = `chrome-extension://${extensionId}/options.html`;
+const optionsUrl = `chrome-extension://${extensionId}/options/options.html`;
 
 // Made-up sites, answered locally (the network edge).
 const pages = {};
@@ -119,8 +119,8 @@ async function capture(page, url, file, { geo = ZOOMED, scrollTo, dark = false }
 const helper = await context.newPage();
 await helper.goto(optionsUrl);
 const entries = (state) => helper.evaluate(async (state) => {
-  const { menuEntries, NO_STATE } = await import('./actions.js');
-  const { DEFAULTS } = await import('./settings.js');
+  const { menuEntries, NO_STATE } = await import('../shared/actions.js');
+  const { DEFAULTS } = await import('../shared/settings.js');
   return menuEntries(DEFAULTS, { ...NO_STATE, ...state });
 }, state);
 // The menu shots' window: five ungrouped tabs, none pinned, so the group items are enabled.
@@ -150,8 +150,8 @@ async function duplicateRun() {
   const before = await strip();
   const target = before[0];
   const closed = await helper.evaluate(async (targetId) => {
-    const { runAction } = await import('./actions.js');
-    const { loadSettings } = await import('./settings.js');
+    const { runAction } = await import('../shared/actions.js');
+    const { loadSettings } = await import('../shared/settings.js');
     const tab = await chrome.tabs.get(targetId);
     const browser = { tabs: chrome.tabs, windows: chrome.windows, session: chrome.storage.session };
     return runAction('close-duplicate-tabs', tab, browser, { settings: await loadSettings(chrome.storage), extensionId: chrome.runtime.id });
@@ -300,7 +300,7 @@ shots.push(menuShot({
   ];
   shots.push(canvas({
     caption: 'Choose what’s in the menu',
-    chrome: windowChrome({ tabs, url: `chrome-extension://${extensionId}/options.html`, w: ZOOMED.w, ext: [EXT_ICON] }),
+    chrome: windowChrome({ tabs, url: `chrome-extension://${extensionId}/options/options.html`, w: ZOOMED.w, ext: [EXT_ICON] }),
     content: page,
     geo: ZOOMED,
   }));
@@ -323,7 +323,7 @@ shots.push(menuShot({
   shots.push(canvas({
     caption: 'Pick the windows, the days and your shortcuts',
     theme: 'dark',
-    chrome: windowChrome({ tabs, url: `chrome-extension://${extensionId}/options.html`, theme: 'dark', w: geo.w, ext: [EXT_ICON] }),
+    chrome: windowChrome({ tabs, url: `chrome-extension://${extensionId}/options/options.html`, theme: 'dark', w: geo.w, ext: [EXT_ICON] }),
     content: page,
     geo,
   }));
@@ -346,7 +346,7 @@ for (const [i, html] of shots.entries()) {
 
 // Promo tile, 440×280.
 {
-  const icon128 = await dataUrl(path.join(root, 'icons', 'icon-128.png'));
+  const icon128 = await dataUrl(path.join(extension, 'icons', 'icon-128.png'));
   await render.setViewportSize({ width: 440, height: 280 });
   const file = path.join(tmp, 'promo.html');
   await writeFile(file, `<!doctype html><meta charset="utf-8"><style>

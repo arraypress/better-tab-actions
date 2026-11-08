@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULTS, UNSYNCED, loadSettings } from '../settings.js';
-import { OLD_SWITCH, OLD_SYNC_ITEM, moveSettingsToSync } from '../migrate.js';
+import { DEFAULTS, UNSYNCED, loadSettings } from '../extension/shared/settings.js';
+import { OLD_SWITCH, OLD_SYNC_ITEM, moveSettingsToSync } from '../extension/background/migrate.js';
 import { fakeChromeStorage } from './fake-browser.js';
 
 /** What the last build saved in local: every setting, normalised, plus the opt-in switch. */

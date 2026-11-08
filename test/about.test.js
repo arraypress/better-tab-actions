@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { ABOUT_LINKS, isPlaceholder } from '../about-links.js';
+import { ABOUT_LINKS, isPlaceholder } from '../extension/options/about-links.js';
 import { placeholderWarning } from '../scripts/warn-placeholder-links.mjs';
 
 const script = fileURLToPath(new URL('../scripts/warn-placeholder-links.mjs', import.meta.url));
@@ -49,7 +49,8 @@ test('package warning: none once every link is real', () => {
 
 test('package script ends with the placeholder warning and ships the links', () => {
   const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
-  assert.match(pkg.scripts.package, / about-links\.js /);
+  // Everything under extension/ ships (test/package.test.js).
+  assert.ok(existsSync(new URL('../extension/options/about-links.js', import.meta.url)));
   assert.match(pkg.scripts.package, /&& node scripts\/warn-placeholder-links\.mjs$/);
 });
 

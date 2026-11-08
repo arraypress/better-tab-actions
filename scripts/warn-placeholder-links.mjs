@@ -4,7 +4,7 @@
  * zip is still fine for testing, just not for the store.
  */
 import { fileURLToPath } from 'node:url';
-import { ABOUT_LINKS, isPlaceholder, REPOSITORY } from '../about-links.js';
+import { ABOUT_LINKS, isPlaceholder, REPOSITORY } from '../extension/options/about-links.js';
 
 /** The warning to print, or null when every link is real. */
 export function placeholderWarning(links = ABOUT_LINKS) {

@@ -5,7 +5,7 @@
  * nothing else of ours runs on every page. This stores the last report per computer and shows
  * the matching glyph.
  */
-import { TOOLBAR_DARK_KEY, TOOLBAR_SCHEME } from './toolbar-scheme.js';
+import { TOOLBAR_DARK_KEY, TOOLBAR_SCHEME } from '../shared/toolbar-scheme.js';
 
 /** The glyph for a scheme; the manifest's default_icon is the light one. From the root, as Chrome resolves setIcon paths against the worker's address. */
 export const toolbarIcon = (dark) => {
@@ -13,7 +13,7 @@ export const toolbarIcon = (dark) => {
   return { 16: `/icons/toolbar/${scheme}-16.png`, 32: `/icons/toolbar/${scheme}-32.png`, 48: `/icons/toolbar/${scheme}-48.png` };
 };
 
-export const OFFSCREEN_PATH = 'offscreen.html';
+export const OFFSCREEN_PATH = 'offscreen/offscreen.html';
 
 export function createToolbarTheme({ storage, action, extensionId }) {
   // One report at a time, so two quick ones can't store one scheme and show the other.

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { forget, lastUsed, noteUsed } from '../recent.js';
+import { forget, lastUsed, noteUsed } from '../extension/background/recent.js';
 
 const tab = (id, windowId = 1, lastAccessed = 0) => ({ id, windowId, lastAccessed });
 

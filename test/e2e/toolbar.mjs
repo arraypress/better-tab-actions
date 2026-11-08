@@ -1,6 +1,6 @@
 /**
- * Real-browser check of the toolbar glyph: loads this folder in Playwright's Chromium (Playwright
- * 1.64 from the Tabby repo, as e2e/groups.mjs does) and checks that
+ * Real-browser check of the toolbar glyph: loads extension/ in Playwright's Chromium (Playwright
+ * 1.64 from the Tabby repo, as test/e2e/groups.mjs does) and checks that
  *
  * - the background opens its offscreen watcher (reason MATCH_MEDIA) at start, once;
  * - a dark options page (page.emulateMedia) gets the dark glyph, then light the light one;
@@ -17,13 +17,13 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import assert from 'node:assert/strict';
-import { toolbarIcon } from '../toolbar-theme.js';
+import { toolbarIcon } from '../../extension/background/toolbar-theme.js';
 
-const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+const extension = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../extension');
 const tmp = await mkdtemp(path.join(tmpdir(), 'mta-toolbar-'));
 const context = await chromium.launchPersistentContext(path.join(tmp, 'profile'), {
   channel: 'chromium',
-  args: [`--disable-extensions-except=${root}`, `--load-extension=${root}`],
+  args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`],
 });
 
 async function until(fn, what, timeout = 5000) {
@@ -42,7 +42,7 @@ async function until(fn, what, timeout = 5000) {
  */
 async function offscreenEmulator(cdp) {
   const { targetInfos } = await cdp.send('Target.getTargets');
-  const target = targetInfos.find((info) => info.url.endsWith('/offscreen.html'));
+  const target = targetInfos.find((info) => info.url.endsWith('/offscreen/offscreen.html'));
   assert.ok(target, 'the offscreen document is a target');
   const { sessionId } = await cdp.send('Target.attachToTarget', { targetId: target.targetId, flatten: false });
   let id = 0;
@@ -61,10 +61,10 @@ try {
   // Right after creation Chrome can list the document before its address is set: wait for both.
   const offscreen = await until(async () => {
     const found = await worker.evaluate(() => chrome.runtime.getContexts({ contextTypes: ['OFFSCREEN_DOCUMENT'] }));
-    return found.length && found.every((context) => context.documentUrl?.endsWith('/offscreen.html')) && found;
+    return found.length && found.every((context) => context.documentUrl?.endsWith('/offscreen/offscreen.html')) && found;
   }, 'the offscreen document');
   assert.equal(offscreen.length, 1);
-  assert.equal(offscreen[0].documentUrl, `chrome-extension://${extensionId}/offscreen.html`);
+  assert.equal(offscreen[0].documentUrl, `chrome-extension://${extensionId}/offscreen/offscreen.html`);
   console.log('✔ the background keeps one offscreen document open, for MATCH_MEDIA');
 
   await worker.evaluate(() => {
@@ -93,7 +93,7 @@ try {
   {
     const page = await context.newPage();
     await page.emulateMedia({ colorScheme: 'light' });
-    await page.goto(`chrome-extension://${extensionId}/options.html`);
+    await page.goto(`chrome-extension://${extensionId}/options/options.html`);
     await page.waitForFunction(() => document.getElementById('menu-items').children.length);
     await page.emulateMedia({ colorScheme: 'dark' });
     await until(async () => (await stored()) === true, 'the dark scheme stored');
@@ -105,7 +105,7 @@ try {
     const before = (await calls()).length;
     const again = await context.newPage();
     await again.emulateMedia({ colorScheme: 'light' });
-    await again.goto(`chrome-extension://${extensionId}/options.html`);
+    await again.goto(`chrome-extension://${extensionId}/options/options.html`);
     await again.waitForFunction(() => document.getElementById('menu-items').children.length);
     await again.waitForTimeout(300);
     assert.equal((await calls()).length, before);

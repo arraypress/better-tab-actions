@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   DEFAULTS, UNSYNCED, changedSettings, loadSettings, normalizeSettings, retryUnsynced, saveSettings, settingsSaver,
-} from '../settings.js';
+} from '../extension/shared/settings.js';
 import { fakeChromeStorage } from './fake-browser.js';
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -120,7 +120,7 @@ test('a setting too big for one sync item stays here; the others still sync', as
 });
 
 test('every action hidden still fits in one sync item', async () => {
-  const { ACTIONS } = await import('../actions.js');
+  const { ACTIONS } = await import('../extension/shared/actions.js');
   const storage = fakeChromeStorage();
   const { synced } = await saveSettings(storage, { hiddenActions: ACTIONS.map((a) => a.id) });
   assert.equal(synced, true);
