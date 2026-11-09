@@ -36,17 +36,21 @@ import { tabUrl } from './sites.js';
  */
 
 const KEY = 'lastClosed';
+/** The most tabs a batch keeps; appending past it forgets the oldest. */
+export const MAX_CLOSED = 500;
 
 /**
  * Remember `tabs` (as returned by chrome.tabs.query) as the latest closed batch, replacing any
- * earlier one. Tabs with no address yet are left out: there'd be nothing to reopen.
+ * earlier one, or added to it (automatic closing, so tabs closed by earlier checks can still be
+ * reopened). Tabs with no address yet are left out: there'd be nothing to reopen.
  *
  * @param {StorageArea} session - `chrome.storage.session`.
  * @param {readonly Tab[]} tabs - The tabs about to close.
  * @param {number} now - When, in ms since the epoch.
+ * @param {{append?: boolean}} [options] - `append`: add to the batch instead of replacing it.
  * @returns {Promise<void>}
  */
-export async function recordClosed(session, tabs, now) {
+export async function recordClosed(session, tabs, now, { append = false } = {}) {
   /** @type {ClosedTab[]} */
   const saved = tabs
     .map((tab) => ({
@@ -56,7 +60,9 @@ export async function recordClosed(session, tabs, now) {
       groupId: tab.groupId ?? -1,
     }))
     .filter((tab) => tab.url);
-  await session.set({ [KEY]: { at: now, tabs: saved } });
+  /** @type {ClosedTab[]} */
+  const earlier = append ? ((await session.get([KEY]))[KEY]?.tabs ?? []) : [];
+  await session.set({ [KEY]: { at: now, tabs: [...earlier, ...saved].slice(-MAX_CLOSED) } });
 }
 
 /**

@@ -12,7 +12,8 @@ import { browserApis, runAction } from '../shared/actions.js';
 import {
   loadWorkspaces, MAX_WORKSPACES, replaceWorkspace, updateWorkspaces, workspaceSummary, WORKSPACES_KEY,
 } from '../shared/workspaces.js';
-import { closeOnOutsideClick, showMenu } from './action-menu.js';
+import { closeOnOutsideClick, moreActionsButton, showMenu } from './action-menu.js';
+import { askText } from './text-dialog.js';
 
 /** @import { Settings } from '../shared/settings.js' */
 /** @import { Workspace } from '../shared/workspaces.js' */
@@ -25,13 +26,11 @@ const list = byId('workspace-list');
 const empty = byId('no-workspaces');
 const full = byId('workspaces-full');
 const menu = byId('workspace-menu', HTMLDialogElement);
-const renameDialog = byId('rename-dialog', HTMLDialogElement);
-const renameInput = byId('rename-name', HTMLInputElement);
 const toast = byId('toast');
 
 /** @type {Workspace[]} */
 let workspaces = [];
-/** The workspace whose ⋮ menu is open (or whose rename dialog is). */
+/** The workspace whose ⋮ menu is open. */
 let current = /** @type {Workspace | undefined} */ (undefined);
 
 /**
@@ -80,22 +79,10 @@ function workspaceRow(workspace) {
   summary.textContent = workspaceSummary(workspace, Date.now());
   label.append(name, summary);
 
-  const more = document.createElement('button');
-  more.type = 'button';
-  more.className = 'icon-button';
-  more.setAttribute('aria-label', `More actions for “${workspace.name}”`);
-  more.setAttribute('aria-haspopup', 'menu');
-  const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  icon.setAttribute('class', 'icon');
-  const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
-  use.setAttribute('href', '#icon-more-vert');
-  icon.append(use);
-  more.append(icon);
-  more.addEventListener('click', () => {
+  row.append(label, moreActionsButton(workspace.name, (button) => {
     current = workspace;
-    showMenu(menu, more);
-  });
-  row.append(label, more);
+    showMenu(menu, button);
+  }));
   return row;
 }
 
@@ -124,10 +111,8 @@ export async function startWorkspaces(settings) {
     if (command === 'open') {
       await runAction('open-workspace', undefined, apis, { settings: settings(), workspaceId: workspace.id });
     } else if (command === 'rename') {
-      renameInput.value = workspace.name;
-      renameDialog.returnValue = ''; // Escape keeps the last one.
-      renameDialog.showModal();
-      renameInput.select();
+      const name = await askText({ title: 'Rename workspace', label: 'Name', value: workspace.name, action: 'Save' });
+      if (name) await updateWorkspaces(chrome.storage.local, (all) => all.map((w) => (w.id === workspace.id ? { ...w, name } : w)));
     } else if (command === 'replace') {
       const page = await chrome.tabs.getCurrent();
       const old = await replaceWorkspace(apis, workspace.id, { now: Date.now(), leaveOut: page?.id });
@@ -136,13 +121,6 @@ export async function startWorkspaces(settings) {
       await updateWorkspaces(chrome.storage.local, (all) => all.filter((w) => w.id !== workspace.id));
       showToast(`Deleted “${workspace.name}”`, () => restore(workspace));
     }
-  });
-
-  renameDialog.addEventListener('close', () => {
-    const name = renameInput.value.trim();
-    const workspace = current;
-    if (renameDialog.returnValue !== 'save' || !name || !workspace) return;
-    updateWorkspaces(chrome.storage.local, (all) => all.map((w) => (w.id === workspace.id ? { ...w, name } : w)));
   });
 
   chrome.storage.onChanged.addListener((changes, area) => {

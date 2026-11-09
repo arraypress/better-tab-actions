@@ -71,6 +71,34 @@
         </span>
         <input id="includeGroupedTabs" type="checkbox" class="switch" role="switch">
       </label>
+      <label class="row two-line">
+        <span class="label">
+          <span>Close unused tabs automatically</span>
+          <span class="secondary">To free memory without closing tabs, use Chrome’s Memory Saver</span>
+        </span>
+        <input id="autoClose" type="checkbox" class="switch" role="switch">
+      </label>
+      <div id="auto-close-options" hidden>
+        <div class="row two-line">
+          <label class="label" for="autoCloseHours">
+            <span>Close tabs not used for</span>
+            <span class="secondary">Except pinned tabs, tabs playing sound and each window’s current tab. Bring them back with “Reopen closed tabs”.</span>
+          </label>
+          <select id="autoCloseHours"></select>
+        </div>
+        <div class="row">
+          <span class="label">Never close tabs from these sites</span>
+          <button id="add-site" type="button">Add</button>
+        </div>
+        <p id="no-sites" class="row text"><span class="label">No sites added</span></p>
+        <ul id="site-list" class="list"></ul>
+      </div>
+      <button id="memory-saver" type="button" class="link-row external">
+        <span class="label">
+          <span>Memory Saver</span>
+          <span class="secondary">In Chrome’s Performance settings</span>
+        </span>
+      </button>
     </section>
 
     <h2 class="section-title" id="h-shortcuts">Keyboard shortcuts</h2>
@@ -113,18 +141,25 @@
     <button type="button" role="menuitem" data-command="delete">Delete</button>
   </dialog>
 
-  <dialog id="rename-dialog" class="dialog">
+  <dialog id="site-menu" class="menu">
+    <button type="button" role="menuitem" data-command="edit">Edit</button>
+    <button type="button" role="menuitem" data-command="remove">Remove</button>
+  </dialog>
+
+  <!-- One field: "Rename workspace", "Add site", "Edit site" (text-dialog.js). -->
+  <dialog id="text-dialog" class="dialog">
     <form method="dialog">
-      <h2 class="dialog-title">Rename workspace</h2>
+      <h2 id="text-dialog-title" class="dialog-title"></h2>
       <div class="dialog-body">
         <div class="field">
-          <label for="rename-name">Name</label>
-          <input id="rename-name" required maxlength="100" autocomplete="off">
+          <label id="text-dialog-label" for="text-dialog-input"></label>
+          <input id="text-dialog-input" maxlength="253" autocomplete="off">
+          <span id="text-dialog-error" class="hint error" hidden></span>
         </div>
       </div>
       <div class="dialog-buttons">
-        <button type="submit" value="cancel" formnovalidate>Cancel</button>
-        <button type="submit" value="save" class="action">Save</button>
+        <button type="submit" value="cancel">Cancel</button>
+        <button id="text-dialog-confirm" type="submit" value="confirm" class="action"></button>
       </div>
     </form>
   </dialog>

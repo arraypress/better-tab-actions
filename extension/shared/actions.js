@@ -151,6 +151,25 @@ const inGroup = (tab) => typeof tab.groupId === 'number' && tab.groupId !== -1;
 const closable = (tab, settings) => !tab.pinned && (settings.includeGroupedTabs || !inGroup(tab));
 
 /**
+ * Whether a tab counts as unused for this long, so "Close tabs not used in N days" and automatic
+ * closing may close it: a tab a close action may close (see {@link closable}) that isn't the
+ * active tab of its window, isn't playing sound, and hasn't been used for `ageMs`. Tabs with no
+ * last-used time are left alone.
+ *
+ * @param {Tab} tab - A tab.
+ * @param {Settings} settings - The user's settings (grouped tabs).
+ * @param {number} now - The time, in ms since the epoch.
+ * @param {number} ageMs - How long unused counts as unused.
+ * @returns {boolean} True when it may be closed.
+ */
+export const unused = (tab, settings, now, ageMs) =>
+  closable(tab, settings) &&
+  !tab.active &&
+  !tab.audible &&
+  typeof tab.lastAccessed === 'number' &&
+  now - tab.lastAccessed >= ageMs;
+
+/**
  * @param {readonly Tab[]} tabs - Tabs.
  * @returns {number[]} Their IDs. Tabs from `chrome.tabs.query` always have one; the type allows none.
  */
@@ -372,16 +391,7 @@ export const ACTIONS = [
     menuTitle: ({ inactiveDays }) => `Close tabs not used in ${plural(inactiveDays, 'day')}`,
     section: 1,
     plan: (target, tabs, { now, settings }) =>
-      close(
-        inScope(target, tabs, settings).filter(
-          (tab) =>
-            closable(tab, settings) &&
-            !tab.active &&
-            !tab.audible &&
-            typeof tab.lastAccessed === 'number' &&
-            now - tab.lastAccessed >= settings.inactiveDays * DAY_MS,
-        ),
-      ),
+      close(inScope(target, tabs, settings).filter((tab) => unused(tab, settings, now, settings.inactiveDays * DAY_MS))),
   },
   {
     // Same window only, like Chrome's own "Close tabs to the right".

@@ -29,9 +29,10 @@ export const EXTENSION = fileURLToPath(new URL('../../extension', import.meta.ur
  * saved groups can only be read once it has closed).
  *
  * @param {string} prefix - The temporary profile's name prefix.
+ * @param {string} [dir] - The unpacked extension: a test build, say. Default {@link EXTENSION}.
  * @returns {ReturnType<typeof extensionProfile>} The profile.
  */
-export const testProfile = (prefix) => extensionProfile(chromium, EXTENSION, { prefix, locale: 'en-GB' });
+export const testProfile = (prefix, dir = EXTENSION) => extensionProfile(chromium, dir, { prefix, locale: 'en-GB' });
 
 /**
  * Answer every `https://<name>.example/` page with a small page titled with its host, and count

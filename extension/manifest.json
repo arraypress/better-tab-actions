@@ -22,7 +22,7 @@
     "page": "options/options.html",
     "open_in_tab": true
   },
-  "permissions": ["contextMenus", "tabs", "tabGroups", "storage", "offscreen"],
+  "permissions": ["contextMenus", "tabs", "tabGroups", "storage", "offscreen", "alarms"],
   "commands": {
     "switch-last-tab": {
       "suggested_key": {

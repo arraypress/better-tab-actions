@@ -8,14 +8,17 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeChromeStorage } from '@arraypress/extension-kit/testing';
 import { ACTIONS } from '../extension/shared/actions.js';
-import { DEFAULTS, normalizeSettings, settingsStore } from '../extension/shared/settings.js';
+import { AUTO_CLOSE_HOURS, DEFAULTS, normalizeSettings, settingsStore } from '../extension/shared/settings.js';
 
-test('defaults: every action shown, this window, 7 days, grouped tabs included, workspaces’ groups reopened', () => {
+test('defaults: every action shown, this window, 7 days, grouped tabs included, no automatic closing, workspaces’ groups reopened', () => {
   assert.deepEqual(DEFAULTS, {
     hiddenActions: [],
     inactiveDays: 7,
     windowScope: 'window',
     includeGroupedTabs: true,
+    autoClose: false,
+    autoCloseHours: 168,
+    keepSites: [],
     reopenGroups: true,
   });
 });
@@ -32,6 +35,9 @@ test('normalizeSettings: rejects junk and clamps days to 1–365', () => {
     windowScope: 'everywhere',
     includeGroupedTabs: 'yes',
     reopenGroups: 'no',
+    autoClose: 1,
+    autoCloseHours: 5,
+    keepSites: 'github.com',
   });
   assert.deepEqual(s, { ...DEFAULTS, hiddenActions: ['a'], inactiveDays: 1 });
   assert.equal(normalizeSettings({ inactiveDays: 9999 }).inactiveDays, 365);
@@ -73,4 +79,19 @@ test('every action hidden still fits in one sync item', async () => {
   const { synced } = await settingsStore.save(storage, { hiddenActions: ACTIONS.map((a) => a.id) });
   assert.equal(synced, true);
   assert.equal(storage.sync.data.hiddenActions.length, ACTIONS.length);
+});
+
+test('normalizeSettings: automatic closing takes an offered age and valid sites, without repeats', () => {
+  assert.deepEqual(AUTO_CLOSE_HOURS, [1, 4, 12, 24, 72, 168]);
+  const s = normalizeSettings({ autoClose: true, autoCloseHours: '12', keepSites: ['https://www.GitHub.com/x', 'github.com', 'not a site', 3, 'docs.example'] });
+  assert.deepEqual([s.autoClose, s.autoCloseHours, s.keepSites], [true, 12, ['github.com', 'docs.example']]);
+});
+
+test('kept sites: cut where the list would no longer fit one sync item, so it always syncs', async () => {
+  const sites = Array.from({ length: 200 }, (_, i) => `site-number-${i}-${'x'.repeat(60)}.example`);
+  const { keepSites } = normalizeSettings({ keepSites: sites });
+  assert.ok(keepSites.length > 50 && keepSites.length < 200);
+  assert.deepEqual(keepSites, sites.slice(0, keepSites.length));
+  const storage = fakeChromeStorage();
+  assert.equal((await settingsStore.save(storage, { keepSites: sites })).synced, true);
 });

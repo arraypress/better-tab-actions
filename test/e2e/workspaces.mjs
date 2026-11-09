@@ -168,8 +168,8 @@ try {
     console.log('✔ Open: the two windows open');
 
     await choose('Rename');
-    await page.locator('#rename-name').fill('Research');
-    await page.getByRole('button', { name: 'Save' }).click();
+    await page.locator('#text-dialog-input').fill('Research');
+    await page.locator('#text-dialog-confirm').click();
     await until(async () => (await stored(worker))[0]?.name === 'Research', 'the new name to be stored');
     await until(async () => (await rows.first().innerText()).startsWith('Research\n'), 'the row to show it');
     console.log('✔ Rename: stored and shown');

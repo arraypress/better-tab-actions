@@ -1,7 +1,8 @@
 /**
  * The service worker: builds the tab right-click menu (with its "Open workspace" submenu), keeps
- * its live labels up to date, runs the actions from the menu and keyboard shortcuts, tracks the
- * recently used tabs for "Switch to last used tab", and starts the light/dark toolbar glyph.
+ * its live labels up to date, runs the actions from the menu and keyboard shortcuts, closes unused
+ * tabs automatically when that's on (auto-close.js), tracks the recently used tabs for "Switch to
+ * last used tab", and starts the light/dark toolbar glyph.
  *
  * @module background/background
  */
@@ -10,6 +11,7 @@ import { settingsStore } from '../shared/settings.js';
 import { closedCount } from '../shared/undo.js';
 import { loadWorkspaces, WORKSPACES_KEY } from '../shared/workspaces.js';
 import { forget, lastUsed, loadRecent, noteUsed, RECENT_KEY } from './recent.js';
+import { AUTO_CLOSE_ALARM, closeUnusedTabs, scheduleAutoClose } from './auto-close.js';
 import { startToolbarTheme } from '../vendor/extension-kit/index.js';
 
 /** @import { MenuEntry } from '../shared/actions.js' */
@@ -124,18 +126,33 @@ Object.assign(globalThis, { runMenuAction: run });
 // Menu items persist, so build them on install/update, on startup (the closed batch is gone
 // after a restart) and when settings change. Any settings change Chrome Sync refused earlier (kept
 // on this computer) is tried again first.
-/** Retry refused settings writes, then build the menu. */
+/** Start or stop the automatic-closing alarm to match the settings. */
+async function schedule() {
+  await scheduleAutoClose(chrome.alarms, await settingsStore.load(chrome.storage))
+    .catch((error) => console.error('Scheduling automatic closing:', error));
+}
+
+/** Retry refused settings writes, then build the menu and schedule automatic closing. */
 async function startUp() {
   await settingsStore.retryUnsynced(chrome.storage).catch((error) => console.error('Retrying settings sync:', error));
-  await buildMenu();
+  await Promise.all([buildMenu(), schedule()]);
 }
 chrome.runtime.onInstalled.addListener(startUp);
 chrome.runtime.onStartup.addListener(startUp);
 // Settings changed here, in another tab or on another computer (through Chrome Sync).
 // A workspace saved, renamed or deleted here or on the settings page changes the "Open workspace" submenu.
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (settingsStore.changed(changes, area).length || (area === 'local' && WORKSPACES_KEY in changes)) buildMenu();
+  const settingsChanged = settingsStore.changed(changes, area).length > 0;
+  if (settingsChanged || (area === 'local' && WORKSPACES_KEY in changes)) buildMenu();
+  if (settingsChanged) schedule();
   if (area === 'session') refreshMenu();
+});
+
+// "Close unused tabs automatically": each check closes what has gone unused (auto-close.js).
+chrome.alarms.onAlarm.addListener(async ({ name }) => {
+  if (name !== AUTO_CLOSE_ALARM) return;
+  const settings = await settingsStore.load(chrome.storage);
+  await closeUnusedTabs(browser, settings, Date.now()).catch((error) => console.error('Closing unused tabs:', error));
 });
 
 // Keep "Mute other tabs" / "Unmute tabs" in step with what's actually muted, and the group items
