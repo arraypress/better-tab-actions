@@ -425,20 +425,21 @@ function optionsShot({ caption, page, theme = 'light' }) {
   shots.push(optionsShot({ caption: 'Choose what’s in the menu', page }));
 }
 
-// 5. Options page (dark): closing settings and shortcuts, from the Closing tabs title down.
+// 5. Options page (dark): automatic closing, on (set as the page would), from "Include tabs in
+//    groups" down to the Memory Saver row.
 {
+  await helper.evaluate(() => chrome.storage.sync.set({ autoClose: true, autoCloseHours: 24, keepSites: ['postbox.example'] }));
   const page = await capture(shotPage, optionsUrl, 'options-dark.png', {
     dark: true,
     scrollTo: () => {
-      const title = document.getElementById('h-closing');
-      if (!title) throw new Error('No Closing tabs title');
-      scrollTo(0, title.getBoundingClientRect().top + scrollY - 16);
+      const row = document.getElementById('includeGroupedTabs')?.closest('.row');
+      if (!row) throw new Error('No Include tabs in groups row');
+      scrollTo(0, row.getBoundingClientRect().top + scrollY);
     },
   });
-  const fits = await shotPage.evaluate(() =>
-    (document.getElementById('h-shortcuts')?.nextElementSibling?.getBoundingClientRect().bottom ?? Infinity) <= innerHeight);
-  if (!fits) throw new Error('Shot 5: the Keyboard shortcuts card no longer fits');
-  shots.push(optionsShot({ caption: 'Pick the windows, the days and your shortcuts', page, theme: 'dark' }));
+  const fits = await shotPage.evaluate(() => (document.getElementById('memory-saver')?.getBoundingClientRect().bottom ?? Infinity) <= innerHeight);
+  if (!fits) throw new Error('Shot 5: automatic closing no longer fits');
+  shots.push(optionsShot({ caption: 'Close tabs you haven’t used, automatically', page, theme: 'dark' }));
 }
 
 // 6. Options page (light): the Workspaces card, three real workspaces, one row's ⋮ menu open.

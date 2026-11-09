@@ -2,8 +2,9 @@
 
 More actions in Chrome’s tab right-click menu: close every tab from a site, close duplicates or
 tabs you haven’t used in a week, reopen what you just closed, sort and mute tabs, turn a whole
-window into a saved tab group, and save your windows as a workspace to reopen later. Plus a
-shortcut to flip back to the last tab you used.
+window into a saved tab group, and save your windows as a workspace to reopen later. It can also
+close tabs you haven’t used for a while by itself. Plus a shortcut to flip back to the last tab
+you used.
 
 ![The tab menu with More tab actions open](store/screenshot-1.png)
 
@@ -47,11 +48,25 @@ Two come set:
 “Save windows as workspace”, “Save this window as workspace” and “Open last workspace” are there
 too, with no key set (Chrome allows an extension at most four suggested keys).
 
+## Close unused tabs automatically
+
+Off until you turn it on (settings page, Closing tabs). Then every few minutes, tabs you haven’t
+used for the time you pick (1, 4 or 12 hours, 1 or 3 days, or 1 week, by Chrome’s own last-used
+time) are closed, in every normal window. They join “Reopen closed tabs”, so they come back in
+their places and groups. Never closed: each window’s current tab, pinned tabs, tabs playing
+sound, incognito tabs, tabs in groups when “Include tabs in groups” is off, and tabs from the
+sites you list under “Never close tabs from these sites”.
+
+Chrome doesn’t tell extensions which tabs are using your camera, microphone or screen, so a
+call that’s quiet in a background tab isn’t recognised: add its site to the list. To free memory
+without closing anything, use Chrome’s own Memory Saver (chrome://settings/performance), which
+the settings page links to.
+
 ## Settings
 
 Click the toolbar icon. Choose which actions appear in the menu, how many days count as inactive,
-which windows the close actions work on, and whether grouped tabs may be closed. Settings sync
-between your computers through Chrome Sync.
+which windows the close actions work on, whether grouped tabs may be closed, automatic closing,
+and your workspaces. Settings sync between your computers through Chrome Sync; workspaces don’t.
 
 ## Privacy
 
@@ -67,9 +82,11 @@ Nothing is collected or sent anywhere: no network requests, no analytics, no acc
 | `tabGroups` | Naming the group when you save a window as a group |
 | `storage` | Your settings; the last closed tabs so they can be reopened; your workspaces (on this computer only, never synced) |
 | `offscreen` | A tiny hidden page that tells whether Chrome is in light or dark mode, for the toolbar icon |
+| `alarms` | Checking for unused tabs every few minutes, while “Close unused tabs automatically” is on |
 
 Chrome shows “Read your browsing history” (for `tabs`) and “View and manage your tab groups”
-(for `tabGroups`) when you install it. Workspaces need no other permission.
+(for `tabGroups`) when you install it. Workspaces need no other permission, and `alarms` shows no
+warning (the e2e check asks Chrome for the manifest’s warnings, with and without it).
 
 ## Install from source
 
@@ -101,10 +118,11 @@ more-tab-actions/
 ├── extension/                  the extension: load this folder, zip its contents
 │   ├── manifest.json
 │   ├── background/             the service worker: background.js (menu, shortcuts, running
-│   │                           actions), recent.js
+│   │                           actions), auto-close.js, recent.js
 │   ├── offscreen/              offscreen.html/.js: tells the worker Chrome's light or dark mode
 │   ├── options/                the settings page, styled like chrome://settings: options.html/
-│   │                           .css/.js, workspaces-section.js, action-menu.js, about-links.js
+│   │                           .css/.js, workspaces-section.js, keep-sites.js, action-menu.js,
+│   │                           text-dialog.js, about-links.js
 │   ├── shared/                 loaded by the worker and the pages: actions.js (what each action
 │   │                           does), workspaces.js, settings.js, sites.js, text.js, undo.js
 │   ├── vendor/extension-kit/   @arraypress/extension-kit's browser half, copied in by npm install

@@ -10,7 +10,7 @@ page, and by the worker at start). The options page debounces its writes (sync a
 The About card's links are in `options/about-links.js` (`githubAboutLinks`; `npm run package`
 warns loudly if one is ever a placeholder). `npm test` (ESLint; `tsc`, a strict check of the JSDoc types;
 node --test; and `extension-kit duplication`, which fails on copied code not listed in `.jscpd-allowlist.json`), `npm run package` (tests, zip, link reminders),
-`npm run e2e` (Playwright checks in real Chromium, `test/e2e/`: the group actions, workspaces, the options page and the toolbar glyph; not part of `npm test`).
+`npm run e2e` (Playwright checks in real Chromium, `test/e2e/`: the group actions, workspaces, automatic closing, the options page and the toolbar glyph; not part of `npm test`).
 `test/package.test.js` checks the zip is exactly `extension/` (less the SVG sources) and that every path the extension names resolves inside it.
 
 Toolbar glyph: `action.default_icon` is a light/dark glyph (`icons/toolbar/`, `npm run toolbar-icons`). The kit does the work: `startToolbarTheme(chrome)` in the worker, `watchColorScheme(chrome)` on the options page, `watchSchemeOffscreen` in `offscreen/` (kept open with reason MATCH_MEDIA, polling as offscreen pages get no `change` events), key `toolbarDark` in local, never synced; `test/e2e/toolbar.mjs` runs the kit's `checkToolbarTheme`.
@@ -49,6 +49,23 @@ What real Chromium does (checked with Playwright's Chromium 156, `test/e2e/works
   it reopens to your saved tab groups"): on keeps the workspace faithful, off reopens the tabs ungrouped and
   adds nothing. Reusing an open group with the same title was rejected: it would pull tabs into another window's
   group, and does nothing for the closed copies that pile up.
+
+## Close unused tabs automatically
+`background/auto-close.js`: an alarm (`close-unused-tabs`, every `CHECK_MINUTES` = 5) while `autoClose` is on
+closes tabs `unused()` (shared with "Close tabs not used in N days" in `shared/actions.js`) for `autoCloseHours`
+(1, 4, 12, 24, 72, 168; `AUTO_CLOSE_HOURS` in settings.js), in normal windows, never incognito, never on
+`keepSites` (or their subdomains). Closed tabs are *appended* to the undo batch (`recordClosed(..., {append: true})`,
+capped at 500) so earlier automatic closes stay reopenable; a menu action still starts a new batch. Sites are
+typed into `options/text-dialog.js` (shared with "Rename workspace") and listed by `options/keep-sites.js`, as
+chrome://settings/performance lists Memory Saver's sites; the list is cut to fit one sync item. Memory Saver is
+only linked, never reimplemented.
+- **Camera, mic, screen.** Chrome exposes no capture state to extensions: with fake devices in Chromium 156, a
+  tab using `getUserMedia` (camera and mic) or `getDisplayMedia` showed no change in any `chrome.tabs.Tab` field
+  (`audible` stays false), and `tabs.discard` didn't refuse it. Only a content script (host permissions) or
+  `debugger`/`tabCapture` could tell, so it isn't attempted; the README says to list a call's site.
+- **`alarms`** has no install warning: `test/e2e/auto-close.mjs` compares Chrome's own warnings for the manifest
+  with and without it. That check runs on a test build (`.test-builds/auto-close/`, gitignored, deleted after)
+  where `HOUR_MS` is a second and `CHECK_MINUTES` 0.02; unpacked extensions may set alarms that short.
 
 ## Design
 - The options page copies chrome://settings. Its look comes from `chrome-ui.css` in `@arraypress/extension-kit`

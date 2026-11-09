@@ -32,6 +32,9 @@ CLOSE TABS
 • Close tabs to the left: the partner to Chrome’s “Close tabs to the right”.
 • Reopen closed tabs: brings back the last batch an action closed, in their windows, places and groups.
 
+CLOSE UNUSED TABS AUTOMATICALLY
+Turn it on to close tabs you haven’t used for 1, 4 or 12 hours, 1 or 3 days, or a week. The tab in front, pinned tabs, tabs playing sound and sites you list are never closed, and Reopen closed tabs brings the rest back. Off until you turn it on. To free memory without closing tabs, Chrome’s Memory Saver is a click away.
+
 TIDY UP
 • Sort tabs by site: tab groups stay together and pinned tabs stay put.
 • Mute other tabs: silences every other tab playing sound. Choose Unmute tabs to bring them back; tabs you muted yourself stay muted.
@@ -62,7 +65,7 @@ No account and no sign-in. More Tab Actions collects nothing and sends nothing. 
 Make Chrome Yours › Functionality & UI (alternative: Productivity › Tools).
 
 **Single Purpose** [REQUIRED]
-Adds extra actions for tabs to Chrome’s tab right-click menu (closing tabs by site, duplicate or unused tabs, reopening them, sorting tabs by site, muting other tabs, putting a window’s tabs into a tab group, and saving windows as a workspace to reopen later), with keyboard shortcuts for the same actions, plus a shortcut to switch back to the last used tab.
+Adds extra actions for tabs to Chrome’s tab right-click menu (closing tabs by site, duplicate or unused tabs, reopening them, sorting tabs by site, muting other tabs, putting a window’s tabs into a tab group, and saving windows as a workspace to reopen later), optionally closing unused tabs by itself, with keyboard shortcuts for the same actions, plus a shortcut to switch back to the last used tab.
 
 **Primary Language** [REQUIRED]
 English.
@@ -79,14 +82,14 @@ English.
 | Screenshot 2 | 1280×800 | ✅ Ready | `store/screenshot-2.png`: “Close duplicate tabs, keep one of each”, the tab strip before and after |
 | Screenshot 3 | 1280×800 | ✅ Ready | `store/screenshot-3.png`: “Mute every other tab”, the menu over tabs playing sound |
 | Screenshot 4 | 1280×800 | ✅ Ready | `store/screenshot-4.png`: “Choose what’s in the menu”, the settings page |
-| Screenshot 5 | 1280×800 | ✅ Ready | `store/screenshot-5.png`: “Pick the windows, the days and your shortcuts”, settings in dark mode: Closing tabs and Keyboard shortcuts |
+| Screenshot 5 | 1280×800 | ✅ Ready | `store/screenshot-5.png`: “Close tabs you haven’t used, automatically”, settings in dark mode: automatic closing on (1 day, one never-close site) and the Memory Saver link |
 | Screenshot 6 | 1280×800 | ✅ Ready | `store/screenshot-6.png`: “Save your windows, reopen them later”, the Workspaces card with three real workspaces and a row’s ⋮ menu open |
 | Small Promo Tile [RECOMMENDED] | 440×280 | ✅ Ready | `store/promo-440x280.png`: icon, name, “More from your tab menu” |
 | Marquee Promo Tile [OPTIONAL] | 1400×560 | ⬜ Not made | Only used if the store features the extension |
 
 **How they were made.** `node store/tools/make-screenshots.mjs` regenerates all seven. It loads
 `extension/` as an unpacked extension in Playwright's Chromium (Playwright 1.64.0 from the Tabby repo).
-- The settings pages (4, 5, 6) are real captures, at 1.2 like the others (shot 2 at 1). The script stops if shot 5’s Keyboard shortcuts card no longer fits. Shot 6’s workspaces are saved by the build’s own `snapshotWindows` and `workspaceName` from windows of the made-up sites (one renamed “Hiking trip”).
+- The settings pages (4, 5, 6) are real captures, at 1.2 like the others (shot 2 at 1). The script stops if shot 5’s rows, down to Memory Saver, no longer fit. Shot 6’s workspaces are saved by the build’s own `snapshotWindows` and `workspaceName` from windows of the made-up sites (one renamed “Hiking trip”).
 - Screenshot 2's tab lists are real: the script opens the tabs, runs the build's own “Close duplicate tabs” (`extension/shared/actions.js` `runAction`, as `extension/background/background.js` does) and draws the strip from `chrome.tabs` before and after.
 - Chrome's tab right-click menu is native, so it can't be captured headlessly; shots 1 and 3 draw it.
   - Its items and order come from Chromium's `tab_menu_model.cc` at tag 157.0.8103.39. They use the macOS Title Case strings, for a signed-out profile with one window and no tab groups.
@@ -106,9 +109,10 @@ English.
 | `contextMenus` | Adds the “More tab actions” submenu to the menu Chrome shows when the user right-clicks a tab. No install warning. |
 | `tabs` | The actions need each open tab’s address to find tabs from the same site and duplicate pages, to sort tabs by site and to name a new tab group after its main site, plus its last-used time for “Close tabs not used in N days”. “Save windows as workspace” reads the open tabs’ addresses, titles and pinned state to keep them on the device; “Open workspace” reopens them and discards the background ones (`chrome.tabs.discard`) so they load only when clicked. Tabs are read on the device, only when the user picks an action or a shortcut, and nothing is sent anywhere. Install warning: “Read your browsing history”. |
 | `tabGroups` | “Save this window as a group” and “Close window and keep as group” name the tab group they make (`chrome.tabGroups.update`, title only; Chrome picks the colour). Saving a workspace reads the open groups’ titles, colours and collapsed state (`chrome.tabGroups.query`), and opening one makes them again with the same title, colour and collapsed state. Making a group itself (`chrome.tabs.group`) needs no permission; reading and naming it do. Nothing is sent anywhere. Install warning: “View and manage your tab groups”. |
-| `storage` | `chrome.storage.sync` keeps the user’s settings (hidden actions, days, windows, grouped tabs), so Chrome Sync carries them to the user’s other computers through their own Google account, like Chrome’s own settings (signed out of Chrome, they stay on the computer). `chrome.storage.local` holds the user’s saved workspaces (`workspaces`: per window, tab addresses, titles, pinned state, tab groups and the window’s size and state; at most 40 of 500 tabs and 200 KB each; this computer only, never synced, deleted with the extension), a settings change Chrome Sync refused for the moment, until it’s retried, and whether Chrome was last seen in light or dark mode (`toolbarDark`, one true/false, this computer only, never synced), for the toolbar icon. `chrome.storage.session` remembers the addresses of the last batch of tabs an action closed, so “Reopen closed tabs” can bring them back. Chrome clears that when it quits. Nothing is sent to the developer. No install warning. |
+| `storage` | `chrome.storage.sync` keeps the user’s settings (hidden actions, days, windows, grouped tabs, automatic closing, the sites it never closes), so Chrome Sync carries them to the user’s other computers through their own Google account, like Chrome’s own settings (signed out of Chrome, they stay on the computer). `chrome.storage.local` holds the user’s saved workspaces (`workspaces`: per window, tab addresses, titles, pinned state, tab groups and the window’s size and state; at most 40 of 500 tabs and 200 KB each; this computer only, never synced, deleted with the extension), a settings change Chrome Sync refused for the moment, until it’s retried, and whether Chrome was last seen in light or dark mode (`toolbarDark`, one true/false, this computer only, never synced), for the toolbar icon. `chrome.storage.session` remembers the addresses of the last batch of tabs an action closed, so “Reopen closed tabs” can bring them back. Chrome clears that when it quits. Nothing is sent to the developer. No install warning. |
 | `commands` (manifest key) | Keyboard shortcuts for the same actions, plus “Switch to last used tab”; two have defaults (Close tabs from this site, Alt+Shift+W; Switch to last used tab, Alt+Shift+Z). Users change them at chrome://extensions/shortcuts. The two group actions and the three workspace actions (save windows, save this window, open the last workspace) have commands with no default key. No install warning. |
 | `action` (manifest key, not a permission) | The toolbar button opens the settings page. Its icon is a plain glyph in Chrome’s own toolbar icon colours, light or dark to match Chrome. |
+| `alarms` | “Close unused tabs automatically” (off by default) checks every 5 minutes, while it’s on, for tabs not used for the time the user chose (`chrome.alarms`, one alarm, cleared when the setting is turned off). It reads only the open tabs’ last-used times, addresses and states, on the device, and closes the unused ones, keeping their addresses in session storage so “Reopen closed tabs” can bring them back. No install warning (checked against Chrome’s `management.getPermissionWarningsByManifest`). |
 | `offscreen` | Keeps one small hidden page (`offscreen/offscreen.html`, reason `MATCH_MEDIA`) that reads whether Chrome is in light or dark mode (`matchMedia('(prefers-color-scheme: dark)')`, which the service worker can’t call), so the toolbar icon matches Chrome’s own icons. It only reads that one true/false and tells the extension’s service worker when it changes; it loads nothing and sends nothing anywhere. No install warning. |
 
 No host permissions, no content scripts, no `scripting`.
@@ -155,7 +159,7 @@ repo must be public first). The text is `PRIVACY.md`; the draft below is the sam
 
 | Version | Date | Notes |
 |---|---|---|
-| 1.0.0 | 2026-11-09 | First build, not yet submitted. Includes “Save this window as a group” and “Close window and keep as group” (adds `tabGroups`, warning “View and manage your tab groups”). Workspaces (save windows, reopen them; kept in local storage only; no new permission). Settings always sync through Chrome Sync (the opt-in switch is gone; earlier test installs’ settings move over by themselves). About card at the end of the settings page. |
+| 1.0.0 | 2026-11-09 | First build, not yet submitted. Includes “Save this window as a group” and “Close window and keep as group” (adds `tabGroups`, warning “View and manage your tab groups”). Workspaces (save windows, reopen them; kept in local storage only; no new permission). Close unused tabs automatically (adds `alarms`, no warning). Settings always sync through Chrome Sync (the opt-in switch is gone; earlier test installs’ settings move over by themselves). About card at the end of the settings page. |
 
 ## Submit checklist
 
@@ -167,7 +171,7 @@ repo must be public first). The text is `PRIVACY.md`; the draft below is the sam
 
 **Build:**
 - [ ] `npm run package` (tests, kit check, zip). The zip is exactly the contents of `extension/`, less the toolbar glyph's SVG sources (`test/package.test.js` checks this):
-      `unzip -l release/more-tab-actions.zip` should list 39 files: `manifest.json` at the root, then `background/` (2), `offscreen/` (2), `options/` (6), `shared/` (6), `vendor/` (12, the kit's browser half) and `icons/` (10 PNGs); no `store/`, `test/`, `scripts/` or `docs/`.
+      `unzip -l release/more-tab-actions.zip` should list 42 files: `manifest.json` at the root, then `background/` (3), `offscreen/` (2), `options/` (8), `shared/` (6), `vendor/` (12, the kit's browser half) and `icons/` (10 PNGs); no `store/`, `test/`, `scripts/` or `docs/`.
 - [ ] **No placeholder links.** `extension/options/about-links.js` points at the GitHub repo (README, Issues, PRIVACY.md); `npm run package` warns loudly if any link is ever set back to example.com.
 - [ ] Load the `extension/` folder in a clean profile and right-click a tab: the submenu, a shortcut and the settings page all work.
 
@@ -179,7 +183,7 @@ repo must be public first). The text is `PRIVACY.md`; the draft below is the sam
    - small promo tile `store/promo-440x280.png`.
 
    Add the homepage and support URLs if you have them.
-3. **Privacy practices**: fill in the single purpose, each permission justification (`contextMenus`, `tabs`, `tabGroups`, `storage`), remote code: No, no data types ticked, the three certifications, and the privacy policy URL.
+3. **Privacy practices**: fill in the single purpose, each permission justification (`contextMenus`, `tabs`, `tabGroups`, `storage`, `offscreen`, `alarms`), remote code: No, no data types ticked, the three certifications, and the privacy policy URL.
 4. **Distribution**: Free; Public; all regions (or as you prefer).
 5. **Test instructions** (if asked): none needed. There’s no login; right-click any tab.
 6. **Submit for review.** Optionally untick “Publish automatically after approval” to choose the moment. Reviews of a `tabs` permission can take a few days; the justification above answers the usual question.

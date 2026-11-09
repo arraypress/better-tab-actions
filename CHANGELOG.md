@@ -16,6 +16,10 @@ First version.
   synced; up to 40 workspaces of up to 500 tabs. **Reopen tab groups** setting, as Chrome saves
   every group it reopens. Shortcuts (no keys set): save windows, save this window, open the last
   workspace.
+- **Close unused tabs automatically** (off by default): tabs not used for 1, 4 or 12 hours, 1 or 3
+  days, or 1 week are closed every few minutes (`chrome.alarms`, no install warning) and join
+  “Reopen closed tabs”. Keeps each window’s current tab, pinned, playing, incognito and (if set)
+  grouped tabs, and a “Never close tabs from these sites” list. Links to Chrome’s Memory Saver.
 - **Switch to last used tab** (Alt+Shift+Z), across windows.
 - Keyboard shortcuts for every action; choose which actions show in the menu.
 - Settings sync through Chrome Sync; settings page styled like chrome://settings, with an About card.
