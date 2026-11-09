@@ -54,6 +54,7 @@ test('save-window-as-group: one new group of the ungrouped, unpinned tabs, named
   assert.deepEqual(b.groups, [{
     title: 'github.com',
     color: 'grey', // Chrome's pick: the extension doesn't set one.
+    collapsed: false,
     windowId: 1,
     urls: ['https://github.com/a', 'https://www.github.com/b', 'https://news.com/', 'chrome://settings/'],
   }]);

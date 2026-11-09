@@ -21,6 +21,8 @@ import { createSettingsStore } from '../vendor/extension-kit/index.js';
  * @property {number} inactiveDays "Close tabs not used in N days", {@link MIN_DAYS}–{@link MAX_DAYS}.
  * @property {'window' | 'all'} windowScope Site, duplicate and inactive closing: the clicked tab's window only, or all windows.
  * @property {boolean} includeGroupedTabs Whether close actions may close tabs that are in a tab group.
+ * @property {boolean} reopenGroups Whether opening a workspace makes its tab groups again (Chrome
+ *   adds each group it makes to its saved tab groups, so reopening adds another copy each time).
  */
 
 /** The fewest days "Close tabs not used in N days" accepts. */
@@ -28,12 +30,13 @@ const MIN_DAYS = 1;
 /** The most days it accepts. */
 const MAX_DAYS = 365;
 
-/** Every setting's default: every action shown, this window, 7 days, grouped tabs included. */
+/** Every setting's default: every action shown, this window, 7 days, grouped tabs included, workspaces' groups reopened. */
 export const DEFAULTS = /** @type {Readonly<Settings>} */ (Object.freeze({
   hiddenActions: [],
   inactiveDays: 7,
   windowScope: 'window',
   includeGroupedTabs: true,
+  reopenGroups: true,
 }));
 
 /**
@@ -56,6 +59,7 @@ export function normalizeSettings(raw = {}) {
     inactiveDays: Number.isFinite(days) ? Math.min(MAX_DAYS, Math.max(MIN_DAYS, days)) : DEFAULTS.inactiveDays,
     windowScope: raw.windowScope === 'all' || raw.windowScope === 'window' ? raw.windowScope : DEFAULTS.windowScope,
     includeGroupedTabs: typeof raw.includeGroupedTabs === 'boolean' ? raw.includeGroupedTabs : DEFAULTS.includeGroupedTabs,
+    reopenGroups: typeof raw.reopenGroups === 'boolean' ? raw.reopenGroups : DEFAULTS.reopenGroups,
   };
 }
 

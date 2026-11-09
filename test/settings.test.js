@@ -10,12 +10,13 @@ import { fakeChromeStorage } from '@arraypress/extension-kit/testing';
 import { ACTIONS } from '../extension/shared/actions.js';
 import { DEFAULTS, normalizeSettings, settingsStore } from '../extension/shared/settings.js';
 
-test('defaults: every action shown, this window, 7 days, grouped tabs included', () => {
+test('defaults: every action shown, this window, 7 days, grouped tabs included, workspaces’ groups reopened', () => {
   assert.deepEqual(DEFAULTS, {
     hiddenActions: [],
     inactiveDays: 7,
     windowScope: 'window',
     includeGroupedTabs: true,
+    reopenGroups: true,
   });
 });
 
@@ -30,11 +31,13 @@ test('normalizeSettings: rejects junk and clamps days to 1–365', () => {
     inactiveDays: '0',
     windowScope: 'everywhere',
     includeGroupedTabs: 'yes',
+    reopenGroups: 'no',
   });
   assert.deepEqual(s, { ...DEFAULTS, hiddenActions: ['a'], inactiveDays: 1 });
   assert.equal(normalizeSettings({ inactiveDays: 9999 }).inactiveDays, 365);
   assert.equal(normalizeSettings({ inactiveDays: '14.4' }).inactiveDays, 14);
   assert.equal(normalizeSettings({ inactiveDays: 'abc' }).inactiveDays, 7);
+  assert.equal(normalizeSettings({ reopenGroups: false }).reopenGroups, false);
 });
 
 test('every setting is synced: none is tied to one computer', () => {

@@ -1,13 +1,14 @@
 /**
- * The service worker: builds the tab right-click menu, keeps its live labels up to date, runs
- * the actions from the menu and keyboard shortcuts, tracks the recently used tabs for "Switch to
- * last used tab", and starts the light/dark toolbar glyph.
+ * The service worker: builds the tab right-click menu (with its "Open workspace" submenu), keeps
+ * its live labels up to date, runs the actions from the menu and keyboard shortcuts, tracks the
+ * recently used tabs for "Switch to last used tab", and starts the light/dark toolbar glyph.
  *
  * @module background/background
  */
-import { menuEntries, menuState, runAction } from '../shared/actions.js';
+import { browserApis, MANAGE_WORKSPACES, menuEntries, menuState, runAction, WORKSPACE_ITEM_PREFIX } from '../shared/actions.js';
 import { settingsStore } from '../shared/settings.js';
 import { closedCount } from '../shared/undo.js';
+import { loadWorkspaces, WORKSPACES_KEY } from '../shared/workspaces.js';
 import { forget, lastUsed, loadRecent, noteUsed, RECENT_KEY } from './recent.js';
 import { startToolbarTheme } from '../vendor/extension-kit/index.js';
 
@@ -16,7 +17,7 @@ import { startToolbarTheme } from '../vendor/extension-kit/index.js';
 const PARENT_ID = 'more-tab-actions';
 /** The shortcut-only command "Switch to last used tab". */
 const SWITCH_LAST = 'switch-last-tab';
-const browser = { tabs: chrome.tabs, windows: chrome.windows, session: chrome.storage.session, tabGroups: chrome.tabGroups };
+const browser = browserApis(chrome);
 
 /**
  * A callback for `chrome.contextMenus.create` (it has no promise form) that logs a failure.
@@ -29,40 +30,61 @@ const logError = (what) => () => {
 };
 
 /**
- * The submenu as it should look now: the settings, the open tabs, the closed batch and the
- * focused window.
+ * The submenu as it should look now: the settings, the open tabs, the closed batch, the focused
+ * window and the saved workspaces.
  *
  * @returns {Promise<MenuEntry[]>} The entries.
  */
 async function currentMenu() {
-  const [settings, tabs, count, [focused]] = await Promise.all([
+  const [settings, tabs, count, [focused], workspaces] = await Promise.all([
     settingsStore.load(chrome.storage),
     chrome.tabs.query({}),
     closedCount(chrome.storage.session),
     // The group items describe the window the user is in: a right-click lands there.
     chrome.tabs.query({ active: true, lastFocusedWindow: true }),
+    loadWorkspaces(chrome.storage.local),
   ]);
-  return menuEntries(settings, menuState(tabs, count, chrome.runtime.id, focused?.windowId));
+  return menuEntries(settings, menuState(tabs, count, chrome.runtime.id, focused?.windowId, workspaces));
 }
 
-/** Build the tab right-click menu: one "More tab actions" submenu holding the visible actions. */
-async function buildMenu() {
-  await chrome.contextMenus.removeAll();
-  const entries = await currentMenu();
-  if (!entries.length) return; // Everything hidden: no menu at all.
+/** @param {chrome.contextMenus.CreateProperties & {id: string}} props - One menu item. */
+const createItem = (props) =>
+  chrome.contextMenus.create({ contexts: ['tab'], ...props }, logError(`Creating "${props.id}"`));
 
-  /** @param {chrome.contextMenus.CreateProperties & {id: string}} props */
-  const create = (props) =>
-    chrome.contextMenus.create({ contexts: ['tab'], ...props }, logError(`Creating "${props.id}"`));
-
-  create({ id: PARENT_ID, title: 'More tab actions' });
+/**
+ * Add entries to the menu under `parentId`, submenus included.
+ *
+ * @param {readonly MenuEntry[]} entries - The entries.
+ * @param {string} parentId - The item they go under.
+ */
+function addItems(entries, parentId) {
   entries.forEach((entry, i) => {
     if (entry.separator) {
-      create({ id: `separator-${i}`, parentId: PARENT_ID, type: 'separator' });
-    } else {
-      create({ id: entry.id, parentId: PARENT_ID, title: entry.title, enabled: entry.enabled });
+      createItem({ id: `${parentId}-separator-${i}`, parentId, type: 'separator' });
+      return;
     }
+    createItem({ id: entry.id, parentId, title: entry.title, enabled: entry.enabled });
+    if (entry.children) addItems(entry.children, entry.id);
   });
+}
+
+/** @type {Promise<void>} */
+let menuBuilt = Promise.resolve();
+/**
+ * Build the tab right-click menu: one "More tab actions" submenu holding the visible actions.
+ * Builds run one after another, so two quick ones can't mix their items.
+ *
+ * @returns {Promise<void>} Settles once built (errors are logged, not thrown).
+ */
+function buildMenu() {
+  menuBuilt = menuBuilt.then(async () => {
+    await chrome.contextMenus.removeAll();
+    const entries = await currentMenu();
+    if (!entries.length) return; // Everything hidden: no menu at all.
+    createItem({ id: PARENT_ID, title: 'More tab actions' });
+    addItems(entries, PARENT_ID);
+  }).catch((error) => console.error('Building the menu:', error));
+  return menuBuilt;
 }
 
 /** @type {ReturnType<typeof setTimeout> | undefined} */
@@ -86,11 +108,12 @@ function refreshMenu() {
  *
  * @param {string} id - The action's id.
  * @param {chrome.tabs.Tab} [tab] - The clicked tab; the active tab when left out.
+ * @param {string} [workspaceId] - For "open-workspace", the workspace; the latest when left out.
  * @returns {Promise<number[]>} The IDs of the tabs it acted on.
  */
-async function run(id, tab) {
+async function run(id, tab, workspaceId) {
   const settings = await settingsStore.load(chrome.storage);
-  return runAction(id, tab, browser, { settings, extensionId: chrome.runtime.id });
+  return runAction(id, tab, browser, { settings, extensionId: chrome.runtime.id, workspaceId });
 }
 // The same handler the menu and shortcuts use, for the service worker's console and the
 // Playwright check (test/e2e/groups.mjs).
@@ -109,8 +132,9 @@ async function startUp() {
 chrome.runtime.onInstalled.addListener(startUp);
 chrome.runtime.onStartup.addListener(startUp);
 // Settings changed here, in another tab or on another computer (through Chrome Sync).
+// A workspace saved, renamed or deleted here or on the settings page changes the "Open workspace" submenu.
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (settingsStore.changed(changes, area).length) buildMenu();
+  if (settingsStore.changed(changes, area).length || (area === 'local' && WORKSPACES_KEY in changes)) buildMenu();
   if (area === 'session') refreshMenu();
 });
 
@@ -127,9 +151,13 @@ chrome.windows.onFocusChanged.addListener((windowId) => {
   if (windowId !== chrome.windows.WINDOW_ID_NONE) refreshMenu();
 });
 
-// Tab right-click menu: acts on the tab that was right-clicked.
+// Tab right-click menu: acts on the tab that was right-clicked. "Open workspace" items open their
+// workspace; "Manage workspaces" opens the settings page at its Workspaces card.
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (tab) run(String(info.menuItemId), tab);
+  const id = String(info.menuItemId);
+  if (id === MANAGE_WORKSPACES) chrome.tabs.create({ url: `${chrome.runtime.getURL('options/options.html')}#workspaces` });
+  else if (id.startsWith(WORKSPACE_ITEM_PREFIX)) run('open-workspace', tab, id.slice(WORKSPACE_ITEM_PREFIX.length));
+  else if (tab) run(id, tab);
 });
 
 // Toolbar icon: open the settings page.

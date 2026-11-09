@@ -213,11 +213,10 @@ async function duplicateRun() {
   const targetId = before[0]?.id;
   if (targetId === undefined) throw new Error('No tabs opened');
   const closed = await helper.evaluate(async ({ targetId, modules }) => {
-    const { runAction } = /** @type {typeof Actions} */ (await import(modules.actions));
+    const { browserApis, runAction } = /** @type {typeof Actions} */ (await import(modules.actions));
     const { settingsStore } = /** @type {typeof SettingsModule} */ (await import(modules.settings));
     const tab = await chrome.tabs.get(targetId);
-    const browser = { tabs: chrome.tabs, windows: chrome.windows, session: chrome.storage.session, tabGroups: chrome.tabGroups };
-    return runAction('close-duplicate-tabs', tab, browser, { settings: await settingsStore.load(chrome.storage), extensionId: chrome.runtime.id });
+    return runAction('close-duplicate-tabs', tab, browserApis(chrome), { settings: await settingsStore.load(chrome.storage), extensionId: chrome.runtime.id });
   }, { targetId, modules: MODULES });
   const after = await strip();
   for (const page of opened) if (!page.isClosed()) await page.close();

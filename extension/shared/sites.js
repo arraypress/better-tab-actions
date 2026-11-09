@@ -58,3 +58,24 @@ export function pageKey(url) {
   const hash = url.indexOf('#');
   return hash === -1 ? url : url.slice(0, hash);
 }
+
+/**
+ * The main site among some tabs: the one with more of them than any other site. Non-web pages
+ * don't count.
+ *
+ * @param {readonly Pick<Tab, 'url' | 'pendingUrl'>[]} tabs - The tabs.
+ * @returns {string | null} The site ("github.com"), or null when there's none or two tie.
+ * @example
+ * mainSite([{ url: 'https://a.com/1' }, { url: 'https://a.com/2' }, { url: 'https://b.com/' }]); // 'a.com'
+ * mainSite([{ url: 'https://a.com/' }, { url: 'https://b.com/' }]); // null
+ */
+export function mainSite(tabs) {
+  /** @type {Map<string, number>} */
+  const counts = new Map();
+  for (const tab of tabs) {
+    const key = siteKey(tabUrl(tab));
+    if (key) counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  const [first, second] = [...counts].sort((a, b) => b[1] - a[1]);
+  return first && (!second || first[1] > second[1]) ? first[0] : null;
+}

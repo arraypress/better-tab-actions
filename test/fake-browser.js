@@ -1,8 +1,9 @@
 /**
- * In-memory stand-in for the browser edge: chrome.tabs, chrome.windows, chrome.tabGroups and
- * chrome.storage.session (@arraypress/extension-kit's fake storage). Holds real state (window
- * membership, tab order, groups, saved groups, mute) so tests check outcomes, not calls. Also
- * `runOn`, which runs an action against it as the background does.
+ * In-memory stand-in for the browser edge: chrome.tabs, chrome.windows, chrome.tabGroups,
+ * chrome.extension's file access and chrome.storage.session and .local (@arraypress/extension-kit's
+ * fake storage). Holds real state (window membership, state and bounds, tab order, pinned and
+ * discarded tabs, groups, saved groups, mute) so tests check outcomes, not calls. Also `runOn`,
+ * which runs an action against it as the background does.
  *
  * @module test/fake-browser
  */
@@ -29,7 +30,20 @@ import { DEFAULTS } from '../extension/shared/settings.js';
 /**
  * An open group the extension made.
  *
- * @typedef {{id: number, windowId: number, title: string, color: string}} FakeGroup
+ * @typedef {{id: number, windowId: number, title: string, color: `${chrome.tabGroups.Color}`, collapsed: boolean}} FakeGroup
+ */
+
+/**
+ * A window's own state: what `chrome.windows` reports besides its tabs.
+ *
+ * @typedef {object} FakeWindow
+ * @property {`${chrome.windows.WindowState}`} state Normal, maximized, minimized or full screen.
+ * @property {`${chrome.windows.WindowType}`} type Normal, popup, app….
+ * @property {boolean} focused Whether it's focused.
+ * @property {number} [left] Its bounds.
+ * @property {number} [top] See `left`.
+ * @property {number} [width] See `left`.
+ * @property {number} [height] See `left`.
  */
 
 /**
@@ -42,7 +56,11 @@ import { DEFAULTS } from '../extension/shared/settings.js';
 /** The id the fake's own extension has. */
 export const EXTENSION_ID = 'test-extension-id';
 
-/** The colours Chrome cycles through for new groups (chrome.tabGroups.Color). */
+/**
+ * The colours Chrome cycles through for new groups.
+ *
+ * @type {`${chrome.tabGroups.Color}`[]}
+ */
 const GROUP_COLORS = ['grey', 'blue', 'red', 'yellow', 'green', 'pink', 'purple', 'cyan', 'orange'];
 
 /**
@@ -74,15 +92,24 @@ export const tabsAt = (...urls) => urls.map((url, i) => ({ id: i + 1, url }));
  * @param {object} [options] - The window state.
  * @param {number} [options.focusedWindowId] - The window Chrome treats as current when an API
  *   call names none (from a service worker, the last focused window). Default 1.
+ * @param {Record<number, Partial<FakeWindow>>} [options.windows] - Windows' own state, by id;
+ *   the rest are normal, unfocused windows with no bounds.
+ * @param {boolean} [options.fileAccess] - Whether the user lets the extension open file:// pages. Default false.
  * @returns The APIs `runAction` takes, plus getters for what tests check.
  */
-export function fakeBrowser(initialTabs, { focusedWindowId = 1 } = {}) {
+export function fakeBrowser(initialTabs, { focusedWindowId = 1, windows: windowSeeds = {}, fileAccess = false } = {}) {
   let nextTabId = 1000;
   let nextWindowId = 100;
   let nextGroupId = 500;
   // Array order = tab order within each window.
   let tabs = initialTabs.map(fakeTab);
-  const openWindows = new Set(tabs.map((t) => t.windowId));
+  /**
+   * @param {Partial<FakeWindow>} [seed] - What differs from an ordinary window.
+   * @returns {FakeWindow} The window.
+   */
+  const fakeWindow = (seed) => ({ state: 'normal', type: 'normal', focused: false, ...seed });
+  /** @type {Map<number, FakeWindow>} Open windows, by id. */
+  const openWindows = new Map(tabs.map((t) => [t.windowId, fakeWindow(windowSeeds[t.windowId])]));
   /** @param {number} windowId */
   const incognito = (windowId) => tabs.some((t) => t.windowId === windowId && t.incognito);
   /**
@@ -146,23 +173,53 @@ export function fakeBrowser(initialTabs, { focusedWindowId = 1 } = {}) {
       tabs = tabs.filter((t) => !ids.includes(t.id));
       dropEmptyGroups();
       // Chrome closes a window when its last tab closes.
-      for (const id of [...openWindows]) {
+      for (const id of [...openWindows.keys()]) {
         if (!tabs.some((t) => t.windowId === id)) openWindows.delete(id);
       }
     },
     /** @param {number} id @param {chrome.tabs.UpdateProperties} props */
-    async update(id, { muted }) {
+    async update(id, { muted, pinned }) {
       const tab = tabById(id);
-      tab.mutedInfo = muted ? { muted: true, reason: 'extension', extensionId: EXTENSION_ID } : { muted: false };
+      if (muted !== undefined) {
+        tab.mutedInfo = muted ? { muted: true, reason: 'extension', extensionId: EXTENSION_ID } : { muted: false };
+      }
+      if (pinned !== undefined) tab.pinned = pinned;
+      return { ...tab };
     },
-    /** @param {chrome.tabs.CreateProperties} props */
-    async create({ windowId, index, url }) {
+    /**
+     * Like Chrome, a pinned tab can't go after an unpinned one, nor an unpinned one before a pinned one.
+     *
+     * @param {chrome.tabs.CreateProperties} props - Where and what.
+     */
+    async create({ windowId, index, url, pinned = false }) {
       if (windowId === undefined || !openWindows.has(windowId)) throw new Error(`No window with id: ${windowId}.`);
-      const tab = fakeTab({ id: nextTabId++, windowId, url });
+      if (url?.startsWith('javascript:')) throw new Error('JavaScript URLs are not allowed in API based extension navigations.');
+      const tab = fakeTab({ id: nextTabId++, windowId, url, pinned });
       const inWindow = tabs.filter((t) => t.windowId === windowId);
-      const before = typeof index === 'number' ? inWindow[index] : undefined;
+      const pinnedCount = inWindow.filter((t) => t.pinned).length;
+      const wanted = typeof index === 'number' ? index : inWindow.length;
+      const clamped = pinned ? Math.min(wanted, pinnedCount) : Math.max(wanted, pinnedCount);
+      const before = inWindow[clamped];
       const at = before ? tabs.indexOf(before) : tabs.findLastIndex((t) => t.windowId === windowId) + 1;
       tabs.splice(at, 0, tab);
+      return { ...tab };
+    },
+    /** @param {number} id */
+    async get(id) {
+      const tab = snapshot().find((t) => t.id === id);
+      if (!tab) throw new Error(`No tab with id: ${id}.`);
+      return tab;
+    },
+    /**
+     * As Chrome 150+ does: the tab keeps its place, address and group but gets a new id. The
+     * active tab can't be discarded.
+     *
+     * @param {number} id - The tab.
+     */
+    async discard(id) {
+      const tab = tabById(id);
+      if (tab.active) throw new Error(`Cannot discard tab with id: ${id}.`);
+      Object.assign(tab, { id: nextTabId++, discarded: true });
       return { ...tab };
     },
     /**
@@ -211,6 +268,7 @@ export function fakeBrowser(initialTabs, { focusedWindowId = 1 } = {}) {
         return groupId;
       }
       const windowId = createProperties?.windowId ?? focusedWindowId;
+      if (chosen.some((t) => t.pinned)) throw new Error('Cannot group pinned tabs.');
       if (!openWindows.has(windowId)) throw new Error(`No window with id: ${windowId}.`);
       for (const t of chosen) {
         if (t.windowId === windowId) continue;
@@ -224,7 +282,7 @@ export function fakeBrowser(initialTabs, { focusedWindowId = 1 } = {}) {
       const before = tabs.slice(0, at).filter((t) => !chosen.includes(t)).length;
       tabs = [...rest.slice(0, before), ...ordered, ...rest.slice(before)];
       for (const t of ordered) t.groupId = id;
-      groups.set(id, { id, windowId, title: '', color: GROUP_COLORS[groups.size % GROUP_COLORS.length] });
+      groups.set(id, { id, windowId, title: '', color: GROUP_COLORS[groups.size % GROUP_COLORS.length], collapsed: false });
       if (!incognito(windowId)) saved.push({ title: '', groupId: id });
       dropEmptyGroups(); // Tabs moved out of their old groups.
       return id;
@@ -233,11 +291,12 @@ export function fakeBrowser(initialTabs, { focusedWindowId = 1 } = {}) {
 
   const tabGroupsApi = {
     /** @param {number} groupId @param {chrome.tabGroups.UpdateProperties} [props] */
-    async update(groupId, { title, color } = {}) {
+    async update(groupId, { title, color, collapsed } = {}) {
       const group = groups.get(groupId);
       if (!group) throw new Error(`No group with id: ${groupId}.`);
       if (title !== undefined) group.title = title;
       if (color !== undefined) group.color = color;
+      if (collapsed !== undefined) group.collapsed = collapsed;
       const copy = savedFor(groupId);
       if (copy) copy.title = group.title;
       return { ...group };
@@ -248,13 +307,38 @@ export function fakeBrowser(initialTabs, { focusedWindowId = 1 } = {}) {
       if (!group) throw new Error(`No group with id: ${groupId}.`);
       return { ...group };
     },
+    /** @param {chrome.tabGroups.QueryInfo} info - Only `windowId` is honoured. */
+    async query({ windowId }) {
+      return [...groups.values()].filter((g) => windowId === undefined || g.windowId === windowId).map((g) => ({ ...g }));
+    },
   };
 
   const windowsApi = {
     /** @param {number} id */
     async get(id) {
-      if (!openWindows.has(id)) throw new Error(`No window with id: ${id}.`);
-      return { id, incognito: incognito(id) };
+      const win = openWindows.get(id);
+      if (!win) throw new Error(`No window with id: ${id}.`);
+      return { id, ...win, incognito: incognito(id) };
+    },
+    /** @param {chrome.windows.QueryOptions} options - Which window types, and whether with their tabs. */
+    async getAll({ populate, windowTypes } = {}) {
+      return [...openWindows]
+        .filter(([, win]) => !windowTypes || windowTypes.includes(win.type))
+        .map(([id, win]) => ({
+          id, ...win, incognito: incognito(id), alwaysOnTop: false,
+          tabs: populate ? snapshot().filter((t) => t.windowId === id) : undefined,
+        }));
+    },
+    /**
+     * @param {number} id - The window.
+     * @param {chrome.windows.UpdateInfo} info - Its new state, or focus.
+     */
+    async update(id, { state, focused }) {
+      const win = openWindows.get(id);
+      if (!win) throw new Error(`No window with id: ${id}.`);
+      if (state !== undefined) win.state = state;
+      if (focused) for (const [other, w] of openWindows) w.focused = other === id;
+      return { id, ...win };
     },
     /**
      * Closes the window and all its tabs at once: its groups stay saved (see `saved`).
@@ -272,21 +356,31 @@ export function fakeBrowser(initialTabs, { focusedWindowId = 1 } = {}) {
       tabs = tabs.filter((t) => t.windowId !== id);
       openWindows.delete(id);
     },
-    /** @param {chrome.windows.CreateData} data */
-    async create({ url }) {
+    /**
+     * Like Chrome, bounds can't be given with a state other than normal. Its first tab is active.
+     *
+     * @param {chrome.windows.CreateData} data - The window.
+     */
+    async create({ url, state = 'normal', focused = true, left, top, width, height }) {
+      const bounds = { left, top, width, height };
+      if (state !== 'normal' && Object.values(bounds).some((v) => v !== undefined)) throw new Error('Invalid value for state');
       const id = nextWindowId++;
-      openWindows.add(id);
-      const created = [url].flat().map((u) => fakeTab({ id: nextTabId++, windowId: id, url: u }));
+      if (focused) for (const w of openWindows.values()) w.focused = false;
+      openWindows.set(id, fakeWindow({ state, focused, ...Object.fromEntries(Object.entries(bounds).filter(([, v]) => v !== undefined)) }));
+      const created = [url ?? 'chrome://newtab/'].flat().map((u, i) => fakeTab({ id: nextTabId++, windowId: id, url: u, active: i === 0 }));
       tabs.push(...created);
       return { id, tabs: created.map((t) => ({ ...t })) };
     },
   };
 
+  const storage = fakeChromeStorage();
   return {
     tabs: tabsApi,
     windows: windowsApi,
     tabGroups: tabGroupsApi,
-    session: fakeChromeStorage().session,
+    session: storage.session,
+    local: storage.local,
+    extension: { isAllowedFileSchemeAccess: async () => fileAccess },
 
     /**
      * A tab as Chrome would pass it to a menu click.
@@ -319,12 +413,31 @@ export function fakeBrowser(initialTabs, { focusedWindowId = 1 } = {}) {
     groupOf: (url) => tabs.find((t) => t.url === url)?.groupId,
     /** IDs of open windows. */
     get windowIds() {
-      return [...openWindows];
+      return [...openWindows.keys()];
     },
-    /** Open groups: { title, color, windowId, urls }, in order of creation. */
+    /**
+     * A window's own state.
+     *
+     * @param {number} id - The window.
+     * @returns {FakeWindow | undefined} A copy, if it's open.
+     */
+    window: (id) => {
+      const win = openWindows.get(id);
+      return win && { ...win };
+    },
+    /** Open groups: { title, color, collapsed, windowId, urls }, in order of creation. */
     get groups() {
-      return [...groups.values()].map((g) => ({ title: g.title, color: g.color, windowId: g.windowId, urls: urlsIn(g.id) }));
+      return [...groups.values()].map((g) => ({ title: g.title, color: g.color, collapsed: g.collapsed, windowId: g.windowId, urls: urlsIn(g.id) }));
     },
+    /**
+     * A window's tabs as "url", with " pinned", " discarded" and " [group title]" when they apply.
+     *
+     * @param {number} windowId - The window.
+     * @returns {string[]} The tabs, in order.
+     */
+    described: (windowId) => tabs
+      .filter((t) => t.windowId === windowId)
+      .map((t) => `${t.url}${t.pinned ? ' pinned' : ''}${t.discarded ? ' discarded' : ''}${groups.has(t.groupId ?? -1) ? ` [${groups.get(t.groupId ?? -1)?.title}]` : ''}`),
     /** Chrome's saved groups: { title, urls, open }. */
     get saved() {
       return saved.map((g) => ({ title: g.title, urls: g.groupId === null ? g.urls : urlsIn(g.groupId), open: g.groupId !== null }));
@@ -346,9 +459,9 @@ export function fakeBrowser(initialTabs, { focusedWindowId = 1 } = {}) {
  * @param {ReturnType<typeof fakeBrowser>} b - The fake.
  * @param {string} id - The action.
  * @param {number | null} targetId - The clicked tab, or null for the active one.
- * @param {{now: number, settings?: Settings, locale?: string}} options - The time, and the settings
- *   (default {@link DEFAULTS}) and locale.
+ * @param {{now: number, settings?: Settings, locale?: string, workspaceId?: string}} options - The time,
+ *   and the settings (default {@link DEFAULTS}), locale and workspace to open.
  * @returns {Promise<number[]>} What `runAction` resolves to.
  */
-export const runOn = (b, id, targetId, { now, settings = DEFAULTS, locale }) =>
-  runAction(id, targetId === null ? undefined : b.tab(targetId), b, { now, settings, extensionId: EXTENSION_ID, locale });
+export const runOn = (b, id, targetId, { now, settings = DEFAULTS, locale, workspaceId }) =>
+  runAction(id, targetId === null ? undefined : b.tab(targetId), b, { now, settings, extensionId: EXTENSION_ID, locale, workspaceId });

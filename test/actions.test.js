@@ -381,7 +381,7 @@ test('unknown action does nothing', async () => {
 
 // --- Menu ---
 
-test('menuEntries: all actions by default: close actions, sort/mute, then the group actions, with separators between', () => {
+test('menuEntries: all actions by default: close actions, sort/mute, the group actions, then workspaces, with separators between', () => {
   assert.deepEqual(
     menuEntries(DEFAULTS).map((e) => (e.separator ? '---' : e.title)),
     [
@@ -397,13 +397,20 @@ test('menuEntries: all actions by default: close actions, sort/mute, then the gr
       '---',
       'Save this window as a group',
       'Close window and keep as group',
+      '---',
+      'Save windows as workspace',
+      'Save this window as workspace',
+      'Open workspace',
     ],
   );
 });
 
 test('menuEntries: hidden actions are left out, and no dangling separator', () => {
   const settings = normalizeSettings({
-    hiddenActions: ['mute-other-tabs', 'sort-tabs-by-site', 'close-tabs-to-left', 'save-window-as-group', 'close-window-keep-group'],
+    hiddenActions: [
+      'mute-other-tabs', 'sort-tabs-by-site', 'close-tabs-to-left', 'save-window-as-group', 'close-window-keep-group',
+      'save-workspace', 'save-window-workspace', 'open-workspace',
+    ],
   });
   const entries = menuEntries(settings);
   assert.equal(entries.some((e) => e.separator), false);

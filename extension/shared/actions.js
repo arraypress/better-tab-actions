@@ -5,13 +5,16 @@
  *
  * @module shared/actions
  */
-import { siteKey, tabUrl, pageKey } from './sites.js';
+import { mainSite, siteKey, tabUrl, pageKey } from './sites.js';
+import { plural, shortDate } from './text.js';
 import { DEFAULTS } from './settings.js';
 import { recordClosed, reopenClosed } from './undo.js';
+import { loadWorkspaces, MAX_WORKSPACES, MENU_WORKSPACES, openWorkspace, saveWorkspace } from './workspaces.js';
 
 /** @import { Tab } from './sites.js' */
 /** @import { Settings } from './settings.js' */
 /** @import { UndoApis } from './undo.js' */
+/** @import { WorkspaceApis } from './workspaces.js' */
 
 /**
  * Live state some menu labels depend on ({@link NO_STATE}'s shape).
@@ -23,6 +26,7 @@ import { recordClosed, reopenClosed } from './undo.js';
  *   what "Save this window as a group" gathers.
  * @property {number} pinnedTabs Pinned tabs in the window.
  * @property {boolean} incognito Whether the window is incognito.
+ * @property {{id: string, name: string}[]} workspaces The saved workspaces, most recent first.
  */
 
 /**
@@ -51,8 +55,9 @@ import { recordClosed, reopenClosed } from './undo.js';
 
 /**
  * A menu action. `title` is also the shortcut description in manifest.json; `menuTitle`
- * overrides it in the menu, and `enabled` can grey it out. An action either has a `plan`, or is
- * `reopen: true` and reopens the last closed batch instead.
+ * overrides it in the menu, `enabled` can grey it out, and `children` makes it a submenu. An
+ * action either has a `plan`, or is `reopen: true` and reopens the last closed batch, or has a
+ * `workspace` job: save every window, save the clicked one, or open a workspace.
  *
  * @typedef {{
  *   id: string,
@@ -60,25 +65,32 @@ import { recordClosed, reopenClosed } from './undo.js';
  *   section: number,
  *   menuTitle?: (settings: Settings, state: MenuState) => string,
  *   enabled?: (state: MenuState) => boolean,
+ *   children?: (state: MenuState) => MenuEntry[],
  * } & (
- *   | {plan: (target: Tab, tabs: Tab[], ctx: PlanContext) => Plan, reopen?: undefined}
- *   | {reopen: true, plan?: undefined}
+ *   | {plan: (target: Tab, tabs: Tab[], ctx: PlanContext) => Plan, reopen?: undefined, workspace?: undefined}
+ *   | {reopen: true, plan?: undefined, workspace?: undefined}
+ *   | {workspace: 'save' | 'save-window' | 'open', plan?: undefined, reopen?: undefined}
  * )} Action
  */
 
 /**
- * An entry in the submenu: an action, or a separator between sections.
+ * An entry in the submenu: an action (perhaps a submenu of its own), or a separator between sections.
  *
- * @typedef {{id: string, title: string, enabled: boolean, separator?: undefined}
- *   | {separator: true, id?: undefined, title?: undefined, enabled?: undefined}} MenuEntry
+ * @typedef {{id: string, title: string, enabled: boolean, children?: MenuEntry[], separator?: undefined}
+ *   | {separator: true, id?: undefined, title?: undefined, enabled?: undefined, children?: undefined}} MenuEntry
  */
+
+/** How the "Open workspace" submenu names one workspace's item: this, then the workspace's id. */
+export const WORKSPACE_ITEM_PREFIX = 'open-workspace:';
+/** The "Open workspace" submenu's last item, to the settings page's Workspaces card. */
+export const MANAGE_WORKSPACES = 'manage-workspaces';
 
 /**
  * The chrome APIs {@link runAction} uses, as the slices it calls: `chrome.tabs`,
- * `chrome.windows`, `chrome.storage.session` and `chrome.tabGroups`. Tests pass an in-memory
- * stand-in.
+ * `chrome.windows`, `chrome.storage.session`, `chrome.tabGroups`, and for workspaces
+ * `chrome.storage.local` and `chrome.extension`. Tests pass an in-memory stand-in.
  *
- * @typedef {UndoApis & {
+ * @typedef {UndoApis & WorkspaceApis & {
  *   tabs: {
  *     query(query: chrome.tabs.QueryInfo): Promise<Tab[]>,
  *     remove(tabIds: number[]): Promise<void>,
@@ -89,6 +101,23 @@ import { recordClosed, reopenClosed } from './undo.js';
  *   tabGroups: {update(groupId: number, props: chrome.tabGroups.UpdateProperties): Promise<unknown>},
  * }} Browser
  */
+
+/**
+ * The real APIs {@link runAction} takes, from the extension's `chrome`.
+ *
+ * @param {typeof chrome} api - `chrome`.
+ * @returns {Browser} Its tabs, windows, tab groups, session and local storage, and file access.
+ * @example
+ * runAction('sort-tabs-by-site', tab, browserApis(chrome));
+ */
+export const browserApis = (api) => ({
+  tabs: api.tabs,
+  windows: api.windows,
+  tabGroups: api.tabGroups,
+  session: api.storage.session,
+  local: api.storage.local,
+  extension: api.extension,
+});
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -103,6 +132,7 @@ export const NO_STATE = /** @type {Readonly<MenuState>} */ (Object.freeze({
   ungroupedTabs: 0,
   pinnedTabs: 0,
   incognito: false,
+  workspaces: [],
 }));
 
 /**
@@ -161,9 +191,10 @@ const groupable = (windowId, tabs) =>
  * @param {number} closedCount - Tabs in the closed batch.
  * @param {string} extensionId - This extension's id.
  * @param {number} [windowId] - The last focused window; none when Chrome has no window.
+ * @param {readonly {id: string, name: string}[]} [workspaces] - The saved workspaces, most recent first.
  * @returns {MenuState} What the menu's labels and greyed-out items follow.
  */
-export function menuState(tabs, closedCount, extensionId, windowId) {
+export function menuState(tabs, closedCount, extensionId, windowId, workspaces = []) {
   const inWindow = tabs.filter((tab) => tab.windowId === windowId);
   return {
     closedCount,
@@ -171,6 +202,7 @@ export function menuState(tabs, closedCount, extensionId, windowId) {
     ungroupedTabs: groupable(windowId, tabs).length,
     pinnedTabs: inWindow.filter((tab) => tab.pinned).length,
     incognito: inWindow.some((tab) => tab.incognito),
+    workspaces: workspaces.map(({ id, name }) => ({ id, name })),
   };
 }
 
@@ -186,15 +218,7 @@ export function menuState(tabs, closedCount, extensionId, windowId) {
  * groupTitle([{ url: 'https://a.com/' }, { url: 'https://b.com/' }], Date.UTC(2026, 10, 8), 'en-GB'); // '8 Nov'
  */
 export function groupTitle(tabs, now, locale) {
-  /** @type {Map<string, number>} */
-  const counts = new Map();
-  for (const tab of tabs) {
-    const key = siteKey(tabUrl(tab));
-    if (key) counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-  const [first, second] = [...counts].sort((a, b) => b[1] - a[1]);
-  if (first && (!second || first[1] > second[1])) return first[0];
-  return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short' }).format(now);
+  return mainSite(tabs) ?? shortDate(now, locale);
 }
 
 /**
@@ -260,13 +284,6 @@ function duplicates(target, tabs, settings) {
   }
   return result;
 }
-
-/**
- * @param {number} n - How many.
- * @param {string} word - The singular noun.
- * @returns {string} "1 day", "2 days".
- */
-const plural = (n, word) => `${n} ${n === 1 ? word : `${word}s`}`;
 
 /**
  * Stable sort by site name; non-web pages (chrome://, file://…) go last.
@@ -441,6 +458,40 @@ export const ACTIONS = [
       return { ...groupWindow(target, tabs, ctx), closeWindow: true };
     },
   },
+  {
+    // Every normal window of this profile (not incognito, popup or app windows). Greyed out once
+    // MAX_WORKSPACES are kept.
+    id: 'save-workspace',
+    title: 'Save windows as workspace',
+    enabled: ({ workspaces }) => workspaces.length < MAX_WORKSPACES,
+    section: 4,
+    workspace: 'save',
+  },
+  {
+    // Not offered in incognito, whose tabs aren't kept.
+    id: 'save-window-workspace',
+    title: 'Save this window as workspace',
+    enabled: ({ workspaces, incognito }) => workspaces.length < MAX_WORKSPACES && !incognito,
+    section: 4,
+    workspace: 'save-window',
+  },
+  {
+    // In the menu, a submenu of the latest workspaces, then "Manage workspaces". As a keyboard
+    // shortcut, it opens the most recently saved one.
+    id: 'open-workspace',
+    title: 'Open last workspace',
+    menuTitle: () => 'Open workspace',
+    enabled: ({ workspaces }) => workspaces.length > 0,
+    children: ({ workspaces }) => workspaces.length
+      ? [
+        ...workspaces.slice(0, MENU_WORKSPACES).map(({ id, name }) => ({ id: `${WORKSPACE_ITEM_PREFIX}${id}`, title: name, enabled: true })),
+        { separator: true },
+        { id: MANAGE_WORKSPACES, title: 'Manage workspaces', enabled: true },
+      ]
+      : [],
+    section: 4,
+    workspace: 'open',
+  },
 ];
 
 const actionsById = new Map(ACTIONS.map((action) => [action.id, action]));
@@ -477,11 +528,15 @@ export function menuEntries(settings = DEFAULTS, state = NO_STATE) {
     if (hidden.has(action.id)) continue;
     if (section !== undefined && action.section !== section) entries.push({ separator: true });
     section = action.section;
-    entries.push({
+    /** @type {MenuEntry} */
+    const entry = {
       id: action.id,
       title: menuTitle(action, settings, state),
       enabled: action.enabled ? action.enabled(state) : true,
-    });
+    };
+    const children = action.children?.(state) ?? [];
+    if (children.length) entry.children = children;
+    entries.push(entry);
   }
   return entries;
 }
@@ -497,22 +552,33 @@ export function menuEntries(settings = DEFAULTS, state = NO_STATE) {
  * @param {number} [options.now] - The time. Default `Date.now()`.
  * @param {Settings} [options.settings] - The user's settings. Default {@link DEFAULTS}.
  * @param {string} [options.extensionId] - This extension's id, to tell its mutes from the user's.
- * @param {string} [options.locale] - For dates in group names; the browser's own when left out.
- * @returns {Promise<number[]>} The IDs of the tabs closed, muted, unmuted, moved, grouped or
- *   reopened; [] for an unknown action or nothing to do.
+ * @param {string} [options.locale] - For dates in group and workspace names; the browser's own when left out.
+ * @param {string} [options.workspaceId] - For "open-workspace": the workspace to open. Default the
+ *   most recently saved.
+ * @returns {Promise<number[]>} The IDs of the tabs closed, muted, unmuted, moved, grouped,
+ *   reopened, saved in a workspace or opened from one; [] for an unknown action or nothing to do.
  */
 export async function runAction(
   id,
   target,
   browser,
-  { now = Date.now(), settings = DEFAULTS, extensionId, locale } = {},
+  { now = Date.now(), settings = DEFAULTS, extensionId, locale, workspaceId } = {},
 ) {
   const action = actionsById.get(id);
   if (!action) return [];
   if (action.reopen) return reopenClosed(browser);
+  if (action.workspace === 'open') {
+    const list = await loadWorkspaces(browser.local);
+    const workspace = workspaceId === undefined ? list[0] : list.find((w) => w.id === workspaceId);
+    return workspace ? openWorkspace(browser, workspace, { reopenGroups: settings.reopenGroups }) : [];
+  }
 
   const clicked = target ?? (await browser.tabs.query({ active: true, lastFocusedWindow: true }))[0];
   if (!clicked) return [];
+  if (action.workspace) {
+    const windowId = action.workspace === 'save-window' ? clicked.windowId : undefined;
+    return (await saveWorkspace(browser, { windowId, now, locale }))?.tabIds ?? [];
+  }
   const tabs = await browser.tabs.query({});
   const plan = action.plan(clicked, tabs, { now, settings, extensionId, locale });
   if (!plan.ids.length) return [];

@@ -9,6 +9,10 @@
   <link rel="stylesheet" href="options.css">
 </head>
 <body>
+  <svg class="sprite" aria-hidden="true">
+    <!-- cr:more-vert -->
+    <symbol id="icon-more-vert" viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></symbol>
+  </svg>
   <header class="toolbar">
     <div class="toolbar-start">
       <img src="../icons/icon-48.png" alt="" width="24" height="24">
@@ -25,6 +29,20 @@
     <section class="card" aria-labelledby="h-menu">
       <p class="row text"><span class="label">Choose what appears under <strong>More tab actions</strong> when you right-click a tab. Hidden actions still work from keyboard shortcuts.</span></p>
       <div id="menu-items" class="menu-items"></div>
+    </section>
+
+    <h2 class="section-title" id="workspaces">Workspaces</h2>
+    <section class="card" aria-labelledby="workspaces">
+      <p id="no-workspaces" class="row text" hidden><span class="label">Workspaces you save appear here. To save your windows, right-click a tab and choose <strong>More tab actions</strong> › <strong>Save windows as workspace</strong>.</span></p>
+      <ul id="workspace-list" class="list"></ul>
+      <p id="workspaces-full" class="row text" hidden><span class="label">You can keep up to 40 workspaces. Delete one to save another.</span></p>
+      <label class="row two-line">
+        <span class="label">
+          <span>Reopen tab groups</span>
+          <span class="secondary">Chrome also adds each group it reopens to your saved tab groups</span>
+        </span>
+        <input id="reopenGroups" type="checkbox" class="switch" role="switch">
+      </label>
     </section>
 
     <h2 class="section-title" id="h-closing">Closing tabs</h2>
@@ -87,6 +105,34 @@
       </a>
     </section>
   </main>
+
+  <dialog id="workspace-menu" class="menu">
+    <button type="button" role="menuitem" data-command="open">Open</button>
+    <button type="button" role="menuitem" data-command="rename">Rename</button>
+    <button type="button" role="menuitem" data-command="replace">Replace with current windows</button>
+    <button type="button" role="menuitem" data-command="delete">Delete</button>
+  </dialog>
+
+  <dialog id="rename-dialog" class="dialog">
+    <form method="dialog">
+      <h2 class="dialog-title">Rename workspace</h2>
+      <div class="dialog-body">
+        <div class="field">
+          <label for="rename-name">Name</label>
+          <input id="rename-name" required maxlength="100" autocomplete="off">
+        </div>
+      </div>
+      <div class="dialog-buttons">
+        <button type="submit" value="cancel" formnovalidate>Cancel</button>
+        <button type="submit" value="save" class="action">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden>
+    <span id="toast-text"></span>
+    <button id="toast-undo" type="button">Undo</button>
+  </div>
   <script type="module" src="options.js"></script>
 </body>
 </html>

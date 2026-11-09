@@ -1,7 +1,8 @@
 /**
- * The options page: which actions the menu shows, how closing works, the
- * keyboard shortcuts that are set, and the About card. Changes show at once
- * and are written once the clicks stop (Chrome Sync allows 120 writes a
+ * The options page: which actions the menu shows, the saved workspaces
+ * (workspaces-section.js) and whether their groups reopen, how closing works,
+ * the keyboard shortcuts that are set, and the About card. Changes show at
+ * once and are written once the clicks stop (Chrome Sync allows 120 writes a
  * minute).
  *
  * @module options/options
@@ -13,12 +14,14 @@ import {
 import { ABOUT_LINKS } from './about-links.js';
 import { ACTIONS, menuTitle } from '../shared/actions.js';
 import { normalizeSettings, settingsStore } from '../shared/settings.js';
+import { startWorkspaces } from './workspaces-section.js';
 
 /** @import { Settings } from '../shared/settings.js' */
 
 const windowScope = byId('windowScope', HTMLSelectElement);
 const inactiveDays = byId('inactiveDays', HTMLInputElement);
 const includeGroupedTabs = byId('includeGroupedTabs', HTMLInputElement);
+const reopenGroups = byId('reopenGroups', HTMLInputElement);
 
 // The toolbar glyph follows this page's light or dark scheme.
 watchColorScheme(chrome).catch((error) => console.debug('Reporting the colour scheme:', error));
@@ -93,10 +96,12 @@ function renderForm() {
   windowScope.value = settings.windowScope;
   inactiveDays.value = String(settings.inactiveDays);
   includeGroupedTabs.checked = settings.includeGroupedTabs;
+  reopenGroups.checked = settings.reopenGroups;
 }
 
 windowScope.addEventListener('change', () => save({ windowScope: windowScope.value }));
 includeGroupedTabs.addEventListener('change', () => save({ includeGroupedTabs: includeGroupedTabs.checked }));
+reopenGroups.addEventListener('change', () => save({ reopenGroups: reopenGroups.checked }));
 inactiveDays.addEventListener('change', () => {
   save({ inactiveDays: inactiveDays.value });
   inactiveDays.value = String(settings.inactiveDays); // Show the clamped value.
@@ -129,3 +134,4 @@ setAboutLinks(ABOUT_LINKS);
 renderForm();
 renderMenuItems();
 renderShortcuts();
+startWorkspaces(() => settings);

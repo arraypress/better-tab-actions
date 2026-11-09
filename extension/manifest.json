@@ -46,7 +46,10 @@
     "sort-tabs-by-site": { "description": "Sort tabs by site" },
     "mute-other-tabs": { "description": "Mute or unmute other tabs" },
     "save-window-as-group": { "description": "Save this window as a group" },
-    "close-window-keep-group": { "description": "Close window and keep as group" }
+    "close-window-keep-group": { "description": "Close window and keep as group" },
+    "save-workspace": { "description": "Save windows as workspace" },
+    "save-window-workspace": { "description": "Save this window as workspace" },
+    "open-workspace": { "description": "Open last workspace" }
   },
   "background": {
     "service_worker": "background/background.js",
