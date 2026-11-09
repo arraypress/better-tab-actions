@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "typecheck": "tsc -p .",
     "duplication": "extension-kit duplication",
-    "e2e": "node test/e2e/groups.mjs && node test/e2e/options.mjs && node test/e2e/toolbar.mjs",
+    "e2e": "node test/e2e/groups.mjs && node test/e2e/workspaces.mjs && node test/e2e/options.mjs && node test/e2e/toolbar.mjs",
     "toolbar-icons": "node scripts/toolbar-icons.mjs",
     "package": "npm test && node scripts/package.mjs"
   },

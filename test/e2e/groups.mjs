@@ -5,62 +5,32 @@
  *
  *   npm run e2e
  *
- * Not run by `npm test` (it launches a browser). What it can't see: Chrome's saved groups. No
- * extension API lists them and their UI is native, so "the group stays saved after its window
- * closes" rests on Chromium's source (see actions.js) and a check by hand in real Chrome.
+ * Not run by `npm test` (it launches a browser). Chrome's saved groups have no extension API and
+ * native UI, so "the group stays saved after its window closes" is read from the closed profile's
+ * store (saved-groups.mjs).
  *
  * @module test/e2e/groups
  */
-import { chromium } from 'playwright';
-import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
-import { launchExtension } from '@arraypress/extension-kit/testing';
+import { click as clickOn, openWindow as openIn, serveExampleSites, testProfile } from './helpers.mjs';
+import { savedGroups } from './saved-groups.mjs';
 
 /**
- * The service worker's global scope: the background's `runMenuAction` (what the menu and
- * shortcuts call), and the groups this check saw Chrome update.
+ * The service worker's global scope, with the groups this check saw Chrome update.
  *
- * @typedef {typeof globalThis & {
- *   runMenuAction: (id: string, tab: chrome.tabs.Tab) => Promise<number[]>,
- *   seenGroups: {windowId: number, title?: string}[],
- * }} WorkerScope
+ * @typedef {import('./helpers.mjs').WorkerScope & {seenGroups: {windowId: number, title?: string}[]}} WorkerScope
  */
 
-const extension = fileURLToPath(new URL('../../extension', import.meta.url));
-const { context, worker, close } = await launchExtension(chromium, extension, { prefix: 'mta-e2e-', locale: 'en-GB' });
+const profile = await testProfile('mta-e2e-');
+const { context, worker, close } = await profile.launch();
 
 try {
   // Made-up sites, answered locally (the network edge).
-  await context.route('https://*.example/**', (route) =>
-    route.fulfill({ contentType: 'text/html', body: `<title>${new URL(route.request().url()).hostname}</title>` }));
-
-  /**
-   * Open a window with these tabs and wait for them to load.
-   *
-   * @param {string[]} urls - The tabs' addresses.
-   * @param {number[]} [pin] - Indexes of the tabs to pin.
-   */
-  const openWindow = (urls, pin = []) => worker.evaluate(async ({ urls, pin }) => {
-    const win = await chrome.windows.create({ url: urls, focused: false });
-    if (win?.id === undefined || !win.tabs) throw new Error('Chrome opened no window');
-    const { id: windowId, tabs: opened } = win;
-    for (const i of pin) await chrome.tabs.update(opened[i].id, { pinned: true });
-    for (let n = 0; n < 50; n++) {
-      const tabs = await chrome.tabs.query({ windowId });
-      if (tabs.every((tab) => tab.status === 'complete' && tab.url)) break;
-      await new Promise((r) => setTimeout(r, 100));
-    }
-    return { windowId, tabIds: opened.flatMap((tab) => tab.id ?? []) };
-  }, { urls, pin });
-
-  /**
-   * Run an action on a tab exactly as a menu click does.
-   *
-   * @param {string} id - The action.
-   * @param {number} tabId - The clicked tab.
-   */
-  const click = (id, tabId) => worker.evaluate(async ({ id, tabId }) =>
-    /** @type {WorkerScope} */ (globalThis).runMenuAction(id, await chrome.tabs.get(tabId)), { id, tabId });
+  await serveExampleSites(context);
+  /** @param {string[]} urls @param {number[]} [pin] */
+  const openWindow = (urls, pin) => openIn(worker, urls, pin);
+  /** @param {string} id @param {number} tabId */
+  const click = (id, tabId) => clickOn(worker, id, tabId);
 
   /**
    * A window's groups (title and addresses) and its ungrouped tabs ("pinned " marks pinned ones).
@@ -117,8 +87,14 @@ try {
     const seen = await worker.evaluate(() => /** @type {WorkerScope} */ (globalThis).seenGroups);
     assert.ok(seen.some((g) => g.windowId === windowId && g.title === 'shop.example'), `group named before closing: ${JSON.stringify(seen)}`);
     console.log('✔ close-window-keep-group: grouped as “shop.example”, then the window closed');
-    console.log('– not checkable here: that Chrome lists it in saved groups (no API exposes them)');
   }
-} finally {
+
+  // 4. Chrome keeps the closed window's group in its saved groups (read from the closed profile).
   await close();
+  const shop = (await savedGroups(profile.dir)).filter((g) => g.title === 'shop.example');
+  assert.deepEqual(shop.map((g) => g.urls), [['https://shop.example/1', 'https://shop.example/2', 'https://c.example/']]);
+  console.log('✔ Chrome keeps “shop.example” in its saved tab groups after the window closed');
+} finally {
+  await close().catch(() => {});
+  await profile.remove();
 }
