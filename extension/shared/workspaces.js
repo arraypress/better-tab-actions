@@ -136,6 +136,8 @@ export const MAX_BYTES = 200 * 1024;
 export const MAX_URL = 8192;
 /** Titles are cut to this many characters. */
 export const MAX_TITLE = 200;
+/** The longest name the Rename dialog takes. */
+export const MAX_NAME_LENGTH = 253;
 /** The most workspaces the "Open workspace" submenu lists. */
 export const MENU_WORKSPACES = 10;
 

@@ -21,8 +21,8 @@ Toolbar glyph: `action.default_icon` is a light/dark glyph (`icons/toolbar/`, `n
 ## Workspaces
 `shared/workspaces.js` (snapshot, name, reopen plan, storage, open/save/replace), wired into `shared/actions.js`
 (actions `save-workspace`, `save-window-workspace`, `open-workspace`: a submenu of the latest 10 plus
-"Manage workspaces", or the latest one from its shortcut), and `options/workspaces-section.js` (the card, ⋮ menu
-via `options/action-menu.js`, rename dialog, toasts with Undo). Stored under `workspaces` in `chrome.storage.local`
+"Manage workspaces", or the latest one from its shortcut), and `options/workspaces-section.js` (the card, ⋮ menu,
+rename dialog, toasts with Undo: the kit's `createMenu`/`moreActionsButton`, `askText` and `createToast`). Stored under `workspaces` in `chrome.storage.local`
 only (it's browsing history: never sync), bounded to 40 workspaces × 500 tabs × 200 KB, URLs ≤ 8,192 characters,
 titles ≤ 200. There's no save confirmation beyond what the extension already does for its actions: the menu
 updates (the new workspace heads "Open workspace", as "Reopen 3 closed tabs" appears after closing), like Chrome's
@@ -42,7 +42,7 @@ What real Chromium does (checked with Playwright's Chromium 156, `test/e2e/works
   moment later, headed too), so `setWindowState` sets it again until it holds. Bounds and a non-normal state
   can't be given together, so windows open normal at their bounds and change state last.
 - **Saved tab groups.** Every group an extension makes is saved by Chrome and pinned to the saved groups bar
-  (the profile's `Sync Data/LevelDB`, read by `test/e2e/saved-groups.mjs`). Closing its window or the browser
+  (the profile's `Sync Data/LevelDB`, read by the kit's `savedTabGroups` from `/testing`). Closing its window or the browser
   keeps it; ungrouping or `tabs.remove` of its tabs deletes it. Nothing dedupes by title, and no API can find
   or reuse a closed saved group, so **each reopen of a workspace adds another saved copy of its groups**.
   Chosen: the synced setting **"Reopen tab groups"** (on by default, secondary text "Chrome also adds each group
@@ -56,7 +56,7 @@ closes tabs `unused()` (shared with "Close tabs not used in N days" in `shared/a
 (1, 4, 12, 24, 72, 168; `AUTO_CLOSE_HOURS` in settings.js), in normal windows, never incognito, never on
 `keepSites` (or their subdomains). Closed tabs are *appended* to the undo batch (`recordClosed(..., {append: true})`,
 capped at 500) so earlier automatic closes stay reopenable; a menu action still starts a new batch. Sites are
-typed into `options/text-dialog.js` (shared with "Rename workspace") and listed by `options/keep-sites.js`, as
+typed into the kit's one-field dialog (`askText`, as "Rename workspace" is) and listed by `options/keep-sites.js`, as
 chrome://settings/performance lists Memory Saver's sites; the list is cut to fit one sync item. Memory Saver is
 only linked, never reimplemented.
 - **Camera, mic, screen.** Chrome exposes no capture state to extensions: with fake devices in Chromium 156, a
@@ -64,13 +64,14 @@ only linked, never reimplemented.
   (`audible` stays false), and `tabs.discard` didn't refuse it. Only a content script (host permissions) or
   `debugger`/`tabCapture` could tell, so it isn't attempted; the README says to list a call's site.
 - **`alarms`** has no install warning: `test/e2e/auto-close.mjs` compares Chrome's own warnings for the manifest
-  with and without it. That check runs on a test build (`.test-builds/auto-close/`, gitignored, deleted after)
+  with and without it (the kit's `warningsAddedBy`). That check runs on a test build (`.test-builds/auto-close/`, gitignored, deleted after)
   where `HOUR_MS` is a second and `CHECK_MINUTES` 0.02; unpacked extensions may set alarms that short.
 
 ## Design
 - The options page copies chrome://settings. Its look comes from `chrome-ui.css` in `@arraypress/extension-kit`
   (`extension/vendor/extension-kit/styles/`). Class names are in the kit's README.
-- Never hand-roll styles for things the kit has (rows, cards, toggles, selects, buttons, link rows).
+- Never hand-roll styles for things the kit has (rows, cards, toggles, selects, buttons, link rows), nor
+  components it has (⋮ menus and their buttons, the one-field dialog, the toast with Undo).
   `options/options.css` holds only what this page adds.
 - One card per section, section titles above cards, help as a row's secondary text, links to
   Chrome pages as link rows (`.link-row.external`).

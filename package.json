@@ -20,7 +20,7 @@
     "url": "https://github.com/arraypress/more-tab-actions.git"
   },
   "devDependencies": {
-    "@arraypress/extension-kit": "^1.1.0",
+    "@arraypress/extension-kit": "^1.2.0",
     "@eslint/js": "^10.0.1",
     "@types/chrome": "^0.3.7",
     "@types/node": "^26.6.6",

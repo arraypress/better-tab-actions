@@ -6,19 +6,17 @@
  *
  * @module options/keep-sites
  */
-import { byId } from '../vendor/extension-kit/index.js';
-import { siteFromInput } from '../shared/sites.js';
-import { closeOnOutsideClick, moreActionsButton, showMenu } from './action-menu.js';
-import { askText } from './text-dialog.js';
+import { askText, byId, createMenu, moreActionsButton } from '../vendor/extension-kit/index.js';
+import { MAX_HOST_LENGTH, siteFromInput } from '../shared/sites.js';
 
 /** @import { Settings } from '../shared/settings.js' */
 
 const list = byId('site-list');
 const empty = byId('no-sites');
-const menu = byId('site-menu', HTMLDialogElement);
+const menu = createMenu();
 
-/** The site whose ⋮ menu is open. */
-let current = '';
+/** The page's current settings and how to store a new list, from {@link startSites}. */
+let page = /** @type {{settings: () => Settings, save: (sites: string[]) => void} | undefined} */ (undefined);
 
 /**
  * Ask for a site, refusing anything that isn't one.
@@ -30,10 +28,21 @@ let current = '';
  */
 async function askSite(title, action, value) {
   const text = await askText({
-    title, label: 'Site', value, action,
+    title, label: 'Site', value, action, maxLength: MAX_HOST_LENGTH,
     validate: (typed) => (siteFromInput(typed) ? null : 'Enter a site, like example.com'),
   });
   return text === null ? null : siteFromInput(text);
+}
+
+/**
+ * "Edit": ask for the site again, and put the answer in its place.
+ *
+ * @param {string} site - The site as kept.
+ * @returns {Promise<void>} Settles once stored.
+ */
+async function edit(site) {
+  const edited = await askSite('Edit site', 'Save', site);
+  if (edited && page) page.save([...new Set(page.settings().keepSites.map((s) => (s === site ? edited : s)))]);
 }
 
 /**
@@ -49,9 +58,11 @@ export function renderSites(sites) {
     const label = document.createElement('span');
     label.className = 'label';
     label.textContent = site;
-    row.append(label, moreActionsButton(site, (button) => {
-      current = site;
-      showMenu(menu, button);
+    row.append(label, moreActionsButton(site, {
+      onClick: (anchor) => menu.open([
+        { label: 'Edit', run: () => edit(site) },
+        { label: 'Remove', run: () => page?.save(page.settings().keepSites.filter((s) => s !== site)) },
+      ], { anchor }),
     }));
     return row;
   }));
@@ -66,22 +77,9 @@ export function renderSites(sites) {
  * @returns {void}
  */
 export function startSites(settings, save) {
-  closeOnOutsideClick(menu);
+  page = { settings, save };
   byId('add-site').addEventListener('click', async () => {
     const site = await askSite('Add site', 'Add');
     if (site) save([...settings().keepSites.filter((s) => s !== site), site]);
-  });
-  menu.addEventListener('click', async (event) => {
-    const item = event.target instanceof Element ? event.target.closest('[data-command]') : null;
-    if (!(item instanceof HTMLElement) || !current) return;
-    const site = current;
-    menu.close();
-    const sites = settings().keepSites;
-    if (item.dataset.command === 'remove') {
-      save(sites.filter((s) => s !== site));
-    } else if (item.dataset.command === 'edit') {
-      const edited = await askSite('Edit site', 'Save', site);
-      if (edited) save([...new Set(sites.map((s) => (s === site ? edited : s)))]);
-    }
   });
 }

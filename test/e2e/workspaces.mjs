@@ -8,7 +8,7 @@
  *    reopened: same windows, tab order, pinned tab, group (title, colour, collapsed) and state.
  * 2. Only each window's active tab loads: the others are discarded before any request and load
  *    when clicked.
- * 3. Chrome's saved tab groups (read from the closed profile, saved-groups.mjs): every group the
+ * 3. Chrome's saved tab groups (read from the closed profile, the kit's savedTabGroups): every group the
  *    extension reopens is saved again, pinned to the bar, so each reopen adds a copy; with
  *    "Reopen tab groups" off, none is added.
  * 4. The settings page: the row and its summary, then Open, Rename, Replace with current windows
@@ -17,9 +17,8 @@
  * @module test/e2e/workspaces
  */
 import assert from 'node:assert/strict';
-import { until } from '@arraypress/extension-kit/testing';
+import { savedTabGroups, until } from '@arraypress/extension-kit/testing';
 import { click, openWindow, serveExampleSites, testProfile } from './helpers.mjs';
-import { savedGroups } from './saved-groups.mjs';
 
 /** @import { Worker } from 'playwright' */
 /** @import { Workspace } from '../../extension/shared/workspaces.js' */
@@ -127,7 +126,7 @@ try {
 
   // 3. Chrome's saved groups: the user's "Reading" and the reopened copy, both pinned.
   {
-    const reading = (await savedGroups(profile.dir)).filter((g) => g.title === 'Reading');
+    const reading = (await savedTabGroups(profile.dir)).filter((g) => g.title === 'Reading');
     assert.equal(reading.length, 2, 'Chrome saved the reopened group as a second “Reading”');
     assert.ok(reading.every((g) => g.pinned && g.urls.join() === [GITHUB_B, NEWS].join()), JSON.stringify(reading));
     console.log('✔ Chromium saves every reopened group again (pinned to the bar): two “Reading” groups now');
@@ -141,7 +140,7 @@ try {
     assert.ok(reopened.tabs.every((tab) => !tab.includes('[')), `no groups: ${reopened.tabs}`);
     await worker.evaluate(() => chrome.storage.sync.set({ reopenGroups: true }));
     await close();
-    assert.equal((await savedGroups(profile.dir)).filter((g) => g.title === 'Reading').length, 2);
+    assert.equal((await savedTabGroups(profile.dir)).filter((g) => g.title === 'Reading').length, 2);
     console.log('✔ with “Reopen tab groups” off, tabs reopen ungrouped and Chrome saves nothing more');
   }
 

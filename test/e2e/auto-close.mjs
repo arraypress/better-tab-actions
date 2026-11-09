@@ -18,7 +18,7 @@ import assert from 'node:assert/strict';
 import { cp, readFile, rm, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { until } from '@arraypress/extension-kit/testing';
+import { until, warningsAddedBy } from '@arraypress/extension-kit/testing';
 import { click, EXTENSION, openWindow, serveExampleSites, testProfile } from './helpers.mjs';
 
 /** @import { Worker } from 'playwright' */
@@ -52,13 +52,11 @@ try {
   // 1. Chrome's own install warnings: alarms adds none.
   {
     const manifest = JSON.parse(await readFile(path.join(EXTENSION, 'manifest.json'), 'utf8'));
-    const warnings = (/** @type {object} */ m) => worker.evaluate((text) => chrome.management.getPermissionWarningsByManifest(text), JSON.stringify(m));
-    const withAlarms = await warnings(manifest);
-    const without = await warnings({ ...manifest, permissions: manifest.permissions.filter((/** @type {string} */ p) => p !== 'alarms') });
+    const { warnings, without } = await warningsAddedBy(worker, manifest, ['alarms']);
     assert.ok(manifest.permissions.includes('alarms'));
-    assert.deepEqual(withAlarms, without);
-    assert.deepEqual(withAlarms, ['Read your browsing history', 'View and manage your tab groups']);
-    console.log(`✔ alarms adds no install warning (Chrome lists: ${withAlarms.map((w) => `“${w}”`).join(', ')})`);
+    assert.deepEqual(warnings, without);
+    assert.deepEqual(warnings, ['Read your browsing history', 'View and manage your tab groups']);
+    console.log(`✔ alarms adds no install warning (Chrome lists: ${warnings.map((w) => `“${w}”`).join(', ')})`);
   }
 
   // 2. Unused tabs close; the rest stay; Reopen closed tabs brings them back.

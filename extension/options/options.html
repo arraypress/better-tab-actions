@@ -9,10 +9,6 @@
   <link rel="stylesheet" href="options.css">
 </head>
 <body>
-  <svg class="sprite" aria-hidden="true">
-    <!-- cr:more-vert -->
-    <symbol id="icon-more-vert" viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></symbol>
-  </svg>
   <header class="toolbar">
     <div class="toolbar-start">
       <img src="../icons/icon-48.png" alt="" width="24" height="24">
@@ -134,40 +130,7 @@
     </section>
   </main>
 
-  <dialog id="workspace-menu" class="menu">
-    <button type="button" role="menuitem" data-command="open">Open</button>
-    <button type="button" role="menuitem" data-command="rename">Rename</button>
-    <button type="button" role="menuitem" data-command="replace">Replace with current windows</button>
-    <button type="button" role="menuitem" data-command="delete">Delete</button>
-  </dialog>
-
-  <dialog id="site-menu" class="menu">
-    <button type="button" role="menuitem" data-command="edit">Edit</button>
-    <button type="button" role="menuitem" data-command="remove">Remove</button>
-  </dialog>
-
-  <!-- One field: "Rename workspace", "Add site", "Edit site" (text-dialog.js). -->
-  <dialog id="text-dialog" class="dialog">
-    <form method="dialog">
-      <h2 id="text-dialog-title" class="dialog-title"></h2>
-      <div class="dialog-body">
-        <div class="field">
-          <label id="text-dialog-label" for="text-dialog-input"></label>
-          <input id="text-dialog-input" maxlength="253" autocomplete="off">
-          <span id="text-dialog-error" class="hint error" hidden></span>
-        </div>
-      </div>
-      <div class="dialog-buttons">
-        <button type="submit" value="cancel">Cancel</button>
-        <button id="text-dialog-confirm" type="submit" value="confirm" class="action"></button>
-      </div>
-    </form>
-  </dialog>
-
-  <div id="toast" class="toast" role="status" aria-live="polite" hidden>
-    <span id="toast-text"></span>
-    <button id="toast-undo" type="button">Undo</button>
-  </div>
+  <!-- The ⋮ menus, the one-field dialog and the toast come from the kit (createMenu, askText, createToast). -->
   <script type="module" src="options.js"></script>
 </body>
 </html>

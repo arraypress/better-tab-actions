@@ -172,7 +172,7 @@ chrome.windows.onFocusChanged.addListener((windowId) => {
 // workspace; "Manage workspaces" opens the settings page at its Workspaces card.
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   const id = String(info.menuItemId);
-  if (id === MANAGE_WORKSPACES) chrome.tabs.create({ url: `${chrome.runtime.getURL('options/options.html')}#workspaces` });
+  if (id === MANAGE_WORKSPACES) chrome.tabs.create({ url: chrome.runtime.getURL('options/options.html#workspaces') });
   else if (id.startsWith(WORKSPACE_ITEM_PREFIX)) run('open-workspace', tab, id.slice(WORKSPACE_ITEM_PREFIX.length));
   else if (tab) run(id, tab);
 });

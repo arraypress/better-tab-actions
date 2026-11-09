@@ -7,13 +7,13 @@
  *
  * Not run by `npm test` (it launches a browser). Chrome's saved groups have no extension API and
  * native UI, so "the group stays saved after its window closes" is read from the closed profile's
- * store (saved-groups.mjs).
+ * store (the kit's savedTabGroups).
  *
  * @module test/e2e/groups
  */
 import assert from 'node:assert/strict';
 import { click as clickOn, openWindow as openIn, serveExampleSites, testProfile } from './helpers.mjs';
-import { savedGroups } from './saved-groups.mjs';
+import { savedTabGroups } from '@arraypress/extension-kit/testing';
 
 /**
  * The service worker's global scope, with the groups this check saw Chrome update.
@@ -91,7 +91,7 @@ try {
 
   // 4. Chrome keeps the closed window's group in its saved groups (read from the closed profile).
   await close();
-  const shop = (await savedGroups(profile.dir)).filter((g) => g.title === 'shop.example');
+  const shop = (await savedTabGroups(profile.dir)).filter((g) => g.title === 'shop.example');
   assert.deepEqual(shop.map((g) => g.urls), [['https://shop.example/1', 'https://shop.example/2', 'https://c.example/']]);
   console.log('✔ Chrome keeps “shop.example” in its saved tab groups after the window closed');
 } finally {

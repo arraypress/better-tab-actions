@@ -14,6 +14,9 @@
  * @typedef {Omit<chrome.tabs.Tab, 'lastAccessed'> & {lastAccessed?: number}} Tab
  */
 
+/** The longest host name DNS allows, and so the longest site the site field takes. */
+export const MAX_HOST_LENGTH = 253;
+
 /**
  * The site a URL belongs to, or null for non-web pages (chrome://, file://, etc.).
  * "www." is ignored, so www.example.com and example.com count as the same site.

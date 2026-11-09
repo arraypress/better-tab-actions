@@ -121,8 +121,8 @@ more-tab-actions/
 │   │                           actions), auto-close.js, recent.js
 │   ├── offscreen/              offscreen.html/.js: tells the worker Chrome's light or dark mode
 │   ├── options/                the settings page, styled like chrome://settings: options.html/
-│   │                           .css/.js, workspaces-section.js, keep-sites.js, action-menu.js,
-│   │                           text-dialog.js, about-links.js
+│   │                           .css/.js, workspaces-section.js, keep-sites.js, about-links.js
+│   │                           (⋮ menus, the one-field dialog and toasts are the kit's)
 │   ├── shared/                 loaded by the worker and the pages: actions.js (what each action
 │   │                           does), workspaces.js, settings.js, sites.js, text.js, undo.js
 │   ├── vendor/extension-kit/   @arraypress/extension-kit's browser half, copied in by npm install
