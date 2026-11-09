@@ -8,7 +8,9 @@
  * - captures the real options page (light and dark);
  * - opens real tabs and runs the real "Close duplicate tabs" action (actions.js runAction, as
  *   background.js does) to get the before/after tab lists;
- * - takes the submenu's labels from actions.js menuEntries, so they match the build.
+ * - takes the submenu's labels from actions.js menuEntries, so they match the build;
+ * - saves real workspaces from windows of made-up sites (workspaces.js snapshotWindows and
+ *   workspaceName) for the Workspaces card.
  *
  * Chrome's own tab right-click menu is native and can't be captured headlessly, so it is drawn
  * (frame.mjs): Chrome 157 on macOS, items and order from Chromium's tab_menu_model.cc at tag
@@ -34,12 +36,13 @@ import {
 /** @import { MenuEntry } from '../../extension/shared/actions.js' */
 /** @import * as Actions from '../../extension/shared/actions.js' */
 /** @import * as SettingsModule from '../../extension/shared/settings.js' */
+/** @import * as WorkspacesModule from '../../extension/shared/workspaces.js' */
 
 /**
  * The extension's own modules, as the options page imports them (relative to options/), for
  * code run inside it.
  */
-const MODULES = { actions: '../shared/actions.js', settings: '../shared/settings.js' };
+const MODULES = { actions: '../shared/actions.js', settings: '../shared/settings.js', workspaces: '../shared/workspaces.js' };
 
 const ZOOMED = geometry(1.2);
 const tools = path.dirname(fileURLToPath(import.meta.url));
@@ -294,7 +297,11 @@ function menuShot({ caption, tabs, url, urlHost, page, hover, entryList, theme =
   const my = WIN.y + 26;
   const main = menu(chromeTabMenu({ closeRightEnabled: clickTab < tabs.length - 1 }), { x: mx, y: my, width: 236, theme });
   const subItems = shown(entryList).map((entry) => ({ title: entry.title, disabled: !entry.enabled, selected: entry.title === hover }));
-  const subY = main.rowTop(OURS_INDEX) - MENU.pad;
+  // Level with "More tab actions", or moved up as far as needed to stay on screen, as macOS does.
+  // The stage is zoomed about the window's corner, so the screen's bottom is nearer in its units.
+  const { height: subHeight } = menu(subItems, { x: 0, y: 0, width: 246, theme });
+  const bottom = WIN.y + (H - 8 - WIN.y) / geo.zoom;
+  const subY = Math.min(main.rowTop(OURS_INDEX) - MENU.pad, bottom - subHeight);
   const sub = menu(subItems, { x: main.x + main.width - 3, y: subY, width: 246, theme });
   const hoverIndex = subItems.findIndex((item) => item.selected);
   const pointer = cursor(sub.x + 150, sub.rowTop(hoverIndex) + 13);
@@ -432,6 +439,47 @@ function optionsShot({ caption, page, theme = 'light' }) {
     (document.getElementById('h-shortcuts')?.nextElementSibling?.getBoundingClientRect().bottom ?? Infinity) <= innerHeight);
   if (!fits) throw new Error('Shot 5: the Keyboard shortcuts card no longer fits');
   shots.push(optionsShot({ caption: 'Pick the windows, the days and your shortcuts', page, theme: 'dark' }));
+}
+
+// 6. Options page (light): the Workspaces card, three real workspaces, one row's ⋮ menu open.
+{
+  /** @type {{urls: string[][], daysAgo: number, name?: string}[]} */
+  const saves = [
+    { urls: [[PAGES.food.url]], daysAgo: 20 },
+    { urls: [[PAGES.mail.url], [PAGES.plan.url, PAGES.mail.url]], daysAgo: 6 },
+    { urls: [[PAGES.bierstadt.url, PAGES.lakes.url, PAGES.lighthouses.url]], daysAgo: 2, name: 'Hiking trip' },
+  ];
+  for (const { urls, daysAgo, name } of saves) {
+    await helper.evaluate(async ({ urls, daysAgo, name, modules }) => {
+      const { snapshotWindows, updateWorkspaces, workspaceName } = /** @type {typeof WorkspacesModule} */ (await import(modules.workspaces));
+      /** @type {number[]} */
+      const ids = [];
+      for (const url of urls) {
+        const win = await chrome.windows.create({ url, focused: false });
+        if (win?.id !== undefined) ids.push(win.id);
+      }
+      for (let n = 0; n < 50; n++) {
+        const tabs = (await chrome.tabs.query({})).filter((tab) => ids.includes(tab.windowId));
+        if (tabs.every((tab) => tab.status === 'complete')) break;
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      const all = await chrome.windows.getAll({ populate: true, windowTypes: ['normal'] });
+      const { windows, skipped } = snapshotWindows(all.filter((win) => win.id !== undefined && ids.includes(win.id)), await chrome.tabGroups.query({}), false);
+      const savedAt = Date.now() - daysAgo * 24 * 60 * 60 * 1000;
+      const workspace = { id: crypto.randomUUID(), name: name ?? workspaceName(windows, savedAt, 'en-GB'), savedAt, skipped, windows };
+      await updateWorkspaces(chrome.storage.local, (list) => [workspace, ...list]);
+      await Promise.all(ids.map((id) => chrome.windows.remove(id)));
+    }, { urls, daysAgo, name, modules: MODULES });
+  }
+  const page = await capture(shotPage, optionsUrl, 'options-workspaces.png', {
+    scrollTo: () => {
+      const title = document.getElementById('workspaces');
+      if (!title) throw new Error('No Workspaces title');
+      scrollTo(0, title.getBoundingClientRect().top + scrollY - 16);
+      /** @type {HTMLButtonElement | null} */ (document.querySelector('#workspace-list .icon-button'))?.click();
+    },
+  });
+  shots.push(optionsShot({ caption: 'Save your windows, reopen them later', page }));
 }
 
 await context.close();

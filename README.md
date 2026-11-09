@@ -1,8 +1,9 @@
 # More Tab Actions
 
 More actions in Chrome’s tab right-click menu: close every tab from a site, close duplicates or
-tabs you haven’t used in a week, reopen what you just closed, sort and mute tabs, and turn a whole
-window into a saved tab group. Plus a shortcut to flip back to the last tab you used.
+tabs you haven’t used in a week, reopen what you just closed, sort and mute tabs, turn a whole
+window into a saved tab group, and save your windows as a workspace to reopen later. Plus a
+shortcut to flip back to the last tab you used.
 
 ![The tab menu with More tab actions open](store/screenshot-1.png)
 
@@ -22,9 +23,19 @@ Right-click any tab → **More tab actions**:
 | Mute other tabs / Unmute tabs | Silences every tab except the one you clicked |
 | Save this window as a group | Puts the window’s loose tabs into one tab group, named after its main site; Chrome saves and syncs it |
 | Close window and keep as group | The same, then closes the window, to park a project for later |
+| Save windows as workspace | Saves every window (not incognito, popup or app windows) with its tabs, pinned tabs, tab groups and size, named after its main sites |
+| Save this window as workspace | The same, for the window you clicked in |
+| Open workspace › | Reopens a saved workspace in new windows; only each window’s active tab loads, the rest load when you click them. Ends with “Manage workspaces” |
 
 Pinned tabs are never closed. Grouped tabs can be left alone (a setting). Actions can work on the
 clicked tab’s window or on every window.
+
+**Workspaces** are listed on the settings page, newest first, where each one’s ⋮ menu opens,
+renames, replaces (with the windows open now) or deletes it. Up to 40 are kept, each up to 500
+tabs; pages that can’t be reopened (such as `chrome://crash`, `javascript:` or `file://` pages
+without file access) are left out and counted. **Reopen tab groups** (on by default) brings the
+groups back; Chrome then adds each reopened group to its saved tab groups, as it does for every
+group, so turn it off if copies pile up there.
 
 **Keyboard shortcuts:** every action can have one (set them at `chrome://extensions/shortcuts`).
 Two come set:
@@ -32,6 +43,9 @@ Two come set:
 - **Alt+Shift+Z** (⌥⇧Z): switch to the last tab you used, even in another window. Press again to
   flip back. Chrome has no shortcut for this; Ctrl+Tab only moves along the tab strip.
 - **Alt+Shift+W** (⌥⇧W): close tabs from this site.
+
+“Save windows as workspace”, “Save this window as workspace” and “Open last workspace” are there
+too, with no key set (Chrome allows an extension at most four suggested keys).
 
 ## Settings
 
@@ -51,11 +65,11 @@ Nothing is collected or sent anywhere: no network requests, no analytics, no acc
 | `contextMenus` | The “More tab actions” submenu on the tab right-click menu |
 | `tabs` | Reading tab addresses and titles to find a site’s tabs, duplicates and unused tabs |
 | `tabGroups` | Naming the group when you save a window as a group |
-| `storage` | Your settings, and the last closed tabs so they can be reopened |
+| `storage` | Your settings; the last closed tabs so they can be reopened; your workspaces (on this computer only, never synced) |
 | `offscreen` | A tiny hidden page that tells whether Chrome is in light or dark mode, for the toolbar icon |
 
 Chrome shows “Read your browsing history” (for `tabs`) and “View and manage your tab groups”
-(for `tabGroups`) when you install it.
+(for `tabGroups`) when you install it. Workspaces need no other permission.
 
 ## Install from source
 
@@ -90,9 +104,9 @@ more-tab-actions/
 │   │                           actions), recent.js
 │   ├── offscreen/              offscreen.html/.js: tells the worker Chrome's light or dark mode
 │   ├── options/                the settings page, styled like chrome://settings: options.html/
-│   │                           .css/.js, about-links.js
+│   │                           .css/.js, workspaces-section.js, action-menu.js, about-links.js
 │   ├── shared/                 loaded by the worker and the pages: actions.js (what each action
-│   │                           does), settings.js, sites.js, undo.js
+│   │                           does), workspaces.js, settings.js, sites.js, text.js, undo.js
 │   ├── vendor/extension-kit/   @arraypress/extension-kit's browser half, copied in by npm install
 │   │                           (not committed): chrome-ui.css, the settings store, the toolbar glyph
 │   └── icons/                  the extension icons, and toolbar/ (the light and dark glyph)

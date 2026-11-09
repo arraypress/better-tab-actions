@@ -8,6 +8,14 @@ First version.
   close other tabs from this site, close duplicate tabs, close tabs not used in N days, close tabs to
   the left, reopen closed tabs, sort tabs by site, mute or unmute other tabs, save this window as a
   group, close window and keep as group.
+- **Workspaces**: save every window, or the one you clicked in, as a named workspace (tabs in
+  order, pinned tabs, tab groups with their colours and collapsed state, window size and state),
+  and reopen it later from **Open workspace** in the tab menu or from the settings page, where each
+  can be opened, renamed, replaced with the current windows or deleted (with Undo). Only each
+  window’s active tab loads; the others load when clicked. Kept on this computer only, never
+  synced; up to 40 workspaces of up to 500 tabs. **Reopen tab groups** setting, as Chrome saves
+  every group it reopens. Shortcuts (no keys set): save windows, save this window, open the last
+  workspace.
 - **Switch to last used tab** (Alt+Shift+Z), across windows.
 - Keyboard shortcuts for every action; choose which actions show in the menu.
 - Settings sync through Chrome Sync; settings page styled like chrome://settings, with an About card.
