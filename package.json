@@ -13,14 +13,14 @@
     "toolbar-icons": "node scripts/toolbar-icons.mjs",
     "package": "npm test && node scripts/package.mjs"
   },
-  "description": "Adds more actions to Chrome\u2019s tab right-click menu.",
+  "description": "Adds more actions to Chrome’s tab right-click menu.",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/arraypress/more-tab-actions.git"
   },
   "devDependencies": {
-    "@arraypress/extension-kit": "file:../Core/extension-kit",
+    "@arraypress/extension-kit": "^1.0.0",
     "@eslint/js": "^10.0.1",
     "@types/chrome": "^0.3.7",
     "@types/node": "^26.6.6",
