@@ -155,7 +155,7 @@ repo must be public first). The text is `PRIVACY.md`; the draft below is the sam
 **You need to do these yourself (they can’t be done from here):**
 - [ ] **Developer account.** Register at https://chrome.google.com/webstore/devconsole (one-time US$5 fee) with the Google account that will own ArrayPress’s listings. Turn on 2-Step Verification, which the dashboard requires.
 - [ ] **Account tab.** Set the publisher name (ArrayPress) and a **contact email**, and verify that email. Complete the trader / non-trader declaration (EU Digital Services Act): as a company, ArrayPress Limited is likely a trader, which needs a verified address and phone number.
-- [ ] **Make the GitHub repo public** (`arraypress/more-tab-actions`). The About card’s Get help, Report an issue and Privacy policy links, and the privacy policy URL, all point into it; while it’s private they show GitHub’s 404. `npm run package` prints a reminder.
+- [x] **Make the GitHub repo public** (done 9 Nov 2026) (`arraypress/more-tab-actions`). The About card’s Get help, Report an issue and Privacy policy links, and the privacy policy URL, all point into it; while it’s private they show GitHub’s 404. `npm run package` prints a reminder.
 - [ ] Decide the **support** contact (email or URL) and whether to add a homepage URL.
 
 **Build:**

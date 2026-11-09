@@ -34,7 +34,7 @@ Tabby's rules (`../Extensions/tabby/CLAUDE.md`, "Wording"): Chrome's own words, 
 quotes and apostrophes, "…" only when something asks for more input.
 
 ## Folders
-- GitHub: `arraypress/more-tab-actions` (private for now). The About links (`extension/options/about-links.js`) point into it, so make it public before the store listing goes live.
+- GitHub: `arraypress/more-tab-actions` (public). The About links (`extension/options/about-links.js`) point into it, so it must stay public.
 - `npm install` first: devDependencies (Playwright, the kit) and the kit's copy in `extension/vendor/`.
 - **Load the `extension/` folder** (chrome://extensions → Load unpacked). `npm run package` writes the store zip to `release/more-tab-actions.zip`: exactly `extension/`, less `icons/**/*.svg`, `*.d.ts` and `.DS_Store` (`scripts/package.mjs`). `docs/bug-report/` is the Chrome separator-bug write-up.
 - Where a file goes: `background/` runs only in the service worker, `offscreen/` and `options/` are those pages, `shared/` is what more than one of them loads (`actions.js` and what it imports are loaded by the worker and the options page), and `vendor/` is the kit's copy.
