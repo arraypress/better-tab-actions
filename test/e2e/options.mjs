@@ -58,7 +58,7 @@ try {
     assert.doesNotMatch(text, /Sync settings/);
     const { version } = JSON.parse(await readFile(new URL('../../extension/manifest.json', import.meta.url), 'utf8'));
     assert.equal(await page.locator('#version').innerText(), `Version ${version}`);
-    assert.match(text, /About More Tab Actions\s+More Tab Actions\s+Version [\d.]+\s+Get help with More Tab Actions\s+Report an issue\s+Privacy policy\s*$/);
+    assert.match(text, /About Better Tab Actions\s+Better Tab Actions\s+Version [\d.]+\s+Get help with Better Tab Actions\s+Report an issue\s+Privacy policy\s*$/);
     assert.equal(await page.locator('#help').getAttribute('href'), ABOUT_LINKS.help);
     assert.equal(await page.locator('#report-issue').getAttribute('href'), ABOUT_LINKS.reportIssue);
     assert.equal(await page.locator('#privacy-policy').getAttribute('href'), ABOUT_LINKS.privacyPolicy);

@@ -1,5 +1,5 @@
 /**
- * More Tab Actions' own settings: the schema and how the store keeps it. The store's general
+ * Better Tab Actions' own settings: the schema and how the store keeps it. The store's general
  * behaviour (refused writes, the debounced saver) is tested in @arraypress/extension-kit.
  *
  * @module test/settings

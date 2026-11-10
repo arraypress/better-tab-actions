@@ -1,4 +1,4 @@
-# More Tab Actions
+# Better Tab Actions
 
 More actions in Chrome’s tab right-click menu: close every tab from a site, close duplicates or
 tabs you haven’t used in a week, reopen what you just closed, sort and mute tabs, turn a whole
@@ -102,7 +102,7 @@ Needs Chrome 150 or later (that’s when Chrome let extensions add to the tab me
 npm install          # Playwright, for the browser tests
 npm test             # lint, type-check (tsc on the JSDoc types), unit tests (node --test), copied-code check
 npm run e2e          # browser tests in Playwright's Chromium
-npm run package      # tests, then release/more-tab-actions.zip for the Chrome Web Store
+npm run package      # tests, then release/better-tab-actions.zip for the Chrome Web Store
 ```
 
 ## Layout
@@ -112,7 +112,7 @@ The extension is the `extension/` folder: it's what you load in Chrome, and exac
 around it.
 
 ```
-more-tab-actions/
+better-tab-actions/
 ├── README.md  LICENSE  PRIVACY.md  CHANGELOG.md  CHROMEWEBSTORE.md  CLAUDE.md
 ├── package.json  package-lock.json  .gitignore
 ├── extension/                  the extension: load this folder, zip its contents

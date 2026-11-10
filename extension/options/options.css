@@ -1,4 +1,4 @@
-/* More Tab Actions settings: chrome-ui.css (@arraypress/extension-kit) does the look, the About
+/* Better Tab Actions settings: chrome-ui.css (@arraypress/extension-kit) does the look, the About
    card and the "Saved" indicator included; only what this page adds is here. */
 
 .days { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; color: var(--text-secondary); }

@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "More Tab Actions",
+  "name": "Better Tab Actions",
   "version": "1.0.0",
   "description": "More actions for Chrome’s tab right-click menu: close tabs by site, duplicates, inactive tabs, mute tabs, save windows as groups.",
   "minimum_chrome_version": "150",
@@ -11,7 +11,7 @@
     "128": "icons/icon-128.png"
   },
   "action": {
-    "default_title": "More Tab Actions settings",
+    "default_title": "Better Tab Actions settings",
     "default_icon": {
       "16": "icons/toolbar/light-16.png",
       "32": "icons/toolbar/light-32.png",

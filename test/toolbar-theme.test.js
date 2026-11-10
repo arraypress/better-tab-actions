@@ -1,5 +1,5 @@
 /**
- * How More Tab Actions wires the light/dark toolbar glyph. The theme itself (reports, the
+ * How Better Tab Actions wires the light/dark toolbar glyph. The theme itself (reports, the
  * offscreen watcher) is tested in @arraypress/extension-kit; test/e2e/toolbar.mjs runs it in Chromium.
  *
  * @module test/toolbar-theme

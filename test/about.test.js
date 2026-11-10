@@ -11,11 +11,11 @@ import { isPlaceholder } from '../extension/vendor/extension-kit/index.js';
 import { ABOUT_LINKS, REPOSITORY } from '../extension/options/about-links.js';
 
 test('about links: help, “Report an issue” and privacy all live in the GitHub repository', () => {
-  assert.equal(REPOSITORY, 'https://github.com/arraypress/more-tab-actions');
+  assert.equal(REPOSITORY, 'https://github.com/arraypress/better-tab-actions');
   assert.deepEqual(ABOUT_LINKS, {
-    help: 'https://github.com/arraypress/more-tab-actions#readme',
-    reportIssue: 'https://github.com/arraypress/more-tab-actions/issues',
-    privacyPolicy: 'https://github.com/arraypress/more-tab-actions/blob/main/PRIVACY.md',
+    help: 'https://github.com/arraypress/better-tab-actions#readme',
+    reportIssue: 'https://github.com/arraypress/better-tab-actions/issues',
+    privacyPolicy: 'https://github.com/arraypress/better-tab-actions/blob/main/PRIVACY.md',
   });
   assert.deepEqual(Object.values(ABOUT_LINKS).filter(isPlaceholder), []);
 });

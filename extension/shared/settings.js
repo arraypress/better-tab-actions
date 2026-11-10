@@ -1,5 +1,5 @@
 /**
- * More Tab Actions' settings: what they are, their defaults, and how anything
+ * Better Tab Actions' settings: what they are, their defaults, and how anything
  * read from storage or the options page becomes valid settings.
  *
  * They live in chrome.storage.sync, one item per setting (the store is

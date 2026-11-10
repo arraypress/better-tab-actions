@@ -1,18 +1,18 @@
-# Chrome Web Store Listing — More Tab Actions
+# Chrome Web Store Listing — Better Tab Actions
 
 > Last Updated: 2026-11-09
 
 Single source of truth for the Developer Dashboard. Update it in the same change as anything
 that alters the listing, permissions, data handling or version. Not shipped: `npm run package`
-zips only the contents of `extension/` (into `release/more-tab-actions.zip`), so this file
+zips only the contents of `extension/` (into `release/better-tab-actions.zip`), so this file
 and `store/` never reach the store.
 
 ## Store Listing
 
 **Extension Name** [REQUIRED] (16/75)
-More Tab Actions
+Better Tab Actions
 <!-- The store takes the title from manifest.json "name". A longer title, e.g.
-     "More Tab Actions – Close Tabs by Site & Duplicates", would mean changing the manifest. -->
+     "Better Tab Actions – Close Tabs by Site & Duplicates", would mean changing the manifest. -->
 
 **Short Description** [REQUIRED] (129/132, from manifest.json "description")
 More actions for Chrome’s tab right-click menu: close tabs by site, duplicates, inactive tabs, mute tabs, save windows as groups.
@@ -58,7 +58,7 @@ Hide the actions you don’t use. Each action can have a keyboard shortcut: Clos
 Switch to last used tab: press Alt+Shift+Z (Option+Shift+Z on Mac) to jump back to the tab you were just on, even in another window. Press it again to flip back. Chrome has no shortcut for this; Ctrl+Tab only moves along the tab strip.
 
 PRIVATE
-No account and no sign-in. More Tab Actions collects nothing and sends nothing. It looks at your open tabs only on your computer, when you choose an action. Workspaces are kept on this computer only. Your settings follow you to your other computers through your own Chrome Sync, like Chrome’s own settings, and never come to us.
+No account and no sign-in. Better Tab Actions collects nothing and sends nothing. It looks at your open tabs only on your computer, when you choose an action. Workspaces are kept on this computer only. Your settings follow you to your other computers through your own Chrome Sync, like Chrome’s own settings, and never come to us.
 ```
 
 **Category** [REQUIRED]
@@ -138,14 +138,14 @@ Settings sync through the user’s own Chrome Sync (their Google account), like 
 
 Certify all three: not sold to third parties; not used or transferred for purposes unrelated to the single purpose; not used to decide creditworthiness or for lending.
 
-**Privacy policy URL**: `https://github.com/arraypress/more-tab-actions/blob/main/PRIVACY.md` (the
+**Privacy policy URL**: `https://github.com/arraypress/better-tab-actions/blob/main/PRIVACY.md` (the
 repo must be public first). The text is `PRIVACY.md`; the draft below is the same.
 
 ### Draft privacy policy
 
-> **More Tab Actions: privacy**
+> **Better Tab Actions: privacy**
 >
-> More Tab Actions works entirely on your computer. It collects nothing and sends nothing.
+> Better Tab Actions works entirely on your computer. It collects nothing and sends nothing.
 >
 > **What it reads:** when you choose one of its actions or shortcuts, it looks at your open tabs’ addresses, titles and last-used times, in Chrome, so it can close, sort, mute, group or reopen the right tabs. Tab groups it makes are kept by Chrome itself, in your saved tab groups, like groups you make.
 >
@@ -166,17 +166,17 @@ repo must be public first). The text is `PRIVACY.md`; the draft below is the sam
 **You need to do these yourself (they can’t be done from here):**
 - [ ] **Developer account.** Register at https://chrome.google.com/webstore/devconsole (one-time US$5 fee) with the Google account that will own ArrayPress’s listings. Turn on 2-Step Verification, which the dashboard requires.
 - [ ] **Account tab.** Set the publisher name (ArrayPress) and a **contact email**, and verify that email. Complete the trader / non-trader declaration (EU Digital Services Act): as a company, ArrayPress Limited is likely a trader, which needs a verified address and phone number.
-- [x] **Make the GitHub repo public** (done 9 Nov 2026) (`arraypress/more-tab-actions`). The About card’s Get help, Report an issue and Privacy policy links, and the privacy policy URL, all point into it; while it’s private they show GitHub’s 404. `npm run package` prints a reminder.
+- [x] **Make the GitHub repo public** (done 9 Nov 2026) (`arraypress/better-tab-actions`). The About card’s Get help, Report an issue and Privacy policy links, and the privacy policy URL, all point into it; while it’s private they show GitHub’s 404. `npm run package` prints a reminder.
 - [ ] Decide the **support** contact (email or URL) and whether to add a homepage URL.
 
 **Build:**
 - [ ] `npm run package` (tests, kit check, zip). The zip is exactly the contents of `extension/`, less the toolbar glyph's SVG sources (`test/package.test.js` checks this):
-      `unzip -l release/more-tab-actions.zip` should list 42 files: `manifest.json` at the root, then `background/` (3), `offscreen/` (2), `options/` (8), `shared/` (6), `vendor/` (12, the kit's browser half) and `icons/` (10 PNGs); no `store/`, `test/`, `scripts/` or `docs/`.
+      `unzip -l release/better-tab-actions.zip` should list 42 files: `manifest.json` at the root, then `background/` (3), `offscreen/` (2), `options/` (8), `shared/` (6), `vendor/` (12, the kit's browser half) and `icons/` (10 PNGs); no `store/`, `test/`, `scripts/` or `docs/`.
 - [ ] **No placeholder links.** `extension/options/about-links.js` points at the GitHub repo (README, Issues, PRIVACY.md); `npm run package` warns loudly if any link is ever set back to example.com.
 - [ ] Load the `extension/` folder in a clean profile and right-click a tab: the submenu, a shortcut and the settings page all work.
 
 **Developer Dashboard, in order:**
-1. **Items › New item**: upload `release/more-tab-actions.zip`.
+1. **Items › New item**: upload `release/better-tab-actions.zip`.
 2. **Store listing**: paste the detailed description and pick the category and language (English). Upload:
    - store icon `extension/icons/icon-128.png`;
    - screenshots `store/screenshot-1.png` … `-6.png`, in that order (1 is the one people see first);

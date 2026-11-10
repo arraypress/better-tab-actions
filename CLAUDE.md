@@ -1,4 +1,4 @@
-# CLAUDE.md — More Tab Actions
+# CLAUDE.md — Better Tab Actions
 
 MV3 extension: extra actions in Chrome's tab right-click menu (`shared/actions.js`, `background/background.js`), with
 an options page (`options/`). The extension is `extension/` (paths below are inside it unless they say otherwise);
@@ -82,11 +82,13 @@ only linked, never reimplemented.
 ## Wording
 Tabby's rules (`../Extensions/tabby/CLAUDE.md`, "Wording"): Chrome's own words, sentence case, curly
 quotes and apostrophes, "…" only when something asks for more input.
+- The extension was called More Tab Actions until 10 Nov 2026 (renamed for the Better family). The tab menu's
+  submenu stays “More tab actions”, as Chrome words its own “More …” entries; `PARENT_ID` stays `more-tab-actions`.
 
 ## Folders
-- GitHub: `arraypress/more-tab-actions` (public). The About links (`extension/options/about-links.js`) point into it, so it must stay public.
+- GitHub: `arraypress/better-tab-actions` (public). The About links (`extension/options/about-links.js`) point into it, so it must stay public.
 - `npm install` first: devDependencies (Playwright, the kit) and the kit's copy in `extension/vendor/`.
-- **Load the `extension/` folder** (chrome://extensions → Load unpacked). `npm run package` writes the store zip to `release/more-tab-actions.zip`: exactly `extension/`, less `icons/**/*.svg`, `*.d.ts` and `.DS_Store` (`scripts/package.mjs`). `docs/bug-report/` is the Chrome separator-bug write-up.
+- **Load the `extension/` folder** (chrome://extensions → Load unpacked). `npm run package` writes the store zip to `release/better-tab-actions.zip`: exactly `extension/`, less `icons/**/*.svg`, `*.d.ts` and `.DS_Store` (`scripts/package.mjs`). `docs/bug-report/` is the Chrome separator-bug write-up.
 - `test/e2e/helpers.mjs` holds what the e2e scripts share (made-up `*.example` sites with request counts, opening a window, running an action as a menu click does).
 - Where a file goes: `background/` runs only in the service worker, `offscreen/` and `options/` are those pages, `shared/` is what more than one of them loads (`actions.js` and what it imports are loaded by the worker and the options page), and `vendor/` is the kit's copy.
 - `store/`: Chrome Web Store screenshots and promo tile (listing text in `CHROMEWEBSTORE.md`). Not packaged. Regenerate with `node store/tools/make-screenshots.mjs`.

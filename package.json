@@ -1,5 +1,5 @@
 {
-  "name": "more-tab-actions",
+  "name": "better-tab-actions",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -17,7 +17,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/arraypress/more-tab-actions.git"
+    "url": "https://github.com/arraypress/better-tab-actions.git"
   },
   "devDependencies": {
     "@arraypress/extension-kit": "^1.4.0",

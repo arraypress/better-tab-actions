@@ -1,6 +1,6 @@
-# More Tab Actions: privacy
+# Better Tab Actions: privacy
 
-More Tab Actions works entirely in Chrome on your computer. It collects nothing and sends nothing.
+Better Tab Actions works entirely in Chrome on your computer. It collects nothing and sends nothing.
 
 ## What it reads
 
@@ -37,5 +37,5 @@ is Chrome’s own, through your Google account. Nobody, including ArrayPress, re
 
 ## Contact
 
-Questions: [open an issue](https://github.com/arraypress/more-tab-actions/issues) or email
+Questions: [open an issue](https://github.com/arraypress/better-tab-actions/issues) or email
 david@arraypress.com.

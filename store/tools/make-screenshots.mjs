@@ -1,5 +1,5 @@
 /**
- * Store screenshots and promo tile for More Tab Actions → ../screenshot-*.png, ../promo-440x280.png.
+ * Store screenshots and promo tile for Better Tab Actions → ../screenshot-*.png, ../promo-440x280.png.
  *
  *   node store/tools/make-screenshots.mjs
  *
@@ -404,7 +404,7 @@ shots.push(menuShot({
 function optionsShot({ caption, page, theme = 'light' }) {
   const tabs = [
     { title: 'Bierstadt Lake loop – Trailhead Journal', icon: SITES.trail.icon },
-    { title: 'More Tab Actions settings', icon: EXT_ICON, active: true },
+    { title: 'Better Tab Actions settings', icon: EXT_ICON, active: true },
   ];
   return canvas({
     caption,
@@ -509,7 +509,7 @@ for (const [i, html] of shots.entries()) {
     img { width: 96px; height: 96px; filter: drop-shadow(0 6px 14px rgba(11,87,208,.28)); }
     h1 { margin: 0; font: 600 30px/1.1 system-ui; color: #1f1f1f; letter-spacing: -.3px; }
     p { margin: 0; font: 400 17px system-ui; color: #444746; }
-  </style><div class="wrap"><img src="${icon128}" alt=""><h1>More Tab Actions</h1><p>More from your tab menu</p></div>`);
+  </style><div class="wrap"><img src="${icon128}" alt=""><h1>Better Tab Actions</h1><p>More from your tab menu</p></div>`);
   await render.goto(`file://${file}`);
   await render.screenshot({ path: path.join(store, 'promo-440x280.png') });
   console.log('store/promo-440x280.png');
