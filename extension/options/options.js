@@ -10,7 +10,8 @@
  */
 
 import {
-  byId, createSettingsSaver, createSiteList, setAboutLinks, setShortcuts, siteHost, statusFlasher, valueRow, watchColorScheme,
+  byId, createSettingsSaver, createSiteList, setAboutLinks, setShortcuts, siteHost, statusFlasher, valueRow,
+  watchColorScheme, withoutSite, withSite, withSiteReplaced,
 } from '../vendor/extension-kit/index.js';
 import { ABOUT_LINKS } from './about-links.js';
 import { ACTIONS, menuTitle } from '../shared/actions.js';
@@ -42,9 +43,9 @@ const keepSites = createSiteList({
   empty: byId('no-sites'),
   addButton: byId('add-site'),
   parse: siteHost,
-  add: (site) => save({ keepSites: [...settings.keepSites.filter((s) => s !== site), site] }),
-  remove: (site) => save({ keepSites: settings.keepSites.filter((s) => s !== site) }),
-  replace: (site, edited) => save({ keepSites: [...new Set(settings.keepSites.map((s) => (s === site ? edited : s)))] }),
+  add: (site) => save({ keepSites: withSite(settings.keepSites, site) }),
+  remove: (site) => save({ keepSites: withoutSite(settings.keepSites, site) }),
+  replace: (site, edited) => save({ keepSites: withSiteReplaced(settings.keepSites, site, edited) }),
 });
 
 /**
