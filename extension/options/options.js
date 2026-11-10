@@ -1,7 +1,7 @@
 /**
  * The options page: which actions the menu shows, the saved workspaces
  * (workspaces-section.js) and whether their groups reopen, how closing works
- * (automatic closing and its never-close sites, keep-sites.js, included), the
+ * (automatic closing and its never-close sites, the kit's site list), the
  * keyboard shortcuts that are set, and the About card. Changes show at
  * once and are written once the clicks stop (Chrome Sync allows 120 writes a
  * minute).
@@ -10,13 +10,12 @@
  */
 
 import {
-  byId, createSettingsSaver, setAboutLinks, setShortcuts, statusFlasher, valueRow, watchColorScheme,
+  byId, createSettingsSaver, createSiteList, setAboutLinks, setShortcuts, siteHost, statusFlasher, valueRow, watchColorScheme,
 } from '../vendor/extension-kit/index.js';
 import { ABOUT_LINKS } from './about-links.js';
 import { ACTIONS, menuTitle } from '../shared/actions.js';
 import { AUTO_CLOSE_HOURS, normalizeSettings, settingsStore } from '../shared/settings.js';
 import { duration } from '../shared/text.js';
-import { renderSites, startSites } from './keep-sites.js';
 import { startWorkspaces } from './workspaces-section.js';
 
 /** @import { Settings } from '../shared/settings.js' */
@@ -35,6 +34,18 @@ watchColorScheme(chrome).catch((error) => console.debug('Reporting the colour sc
 let settings = await settingsStore.load(chrome.storage);
 const flash = statusFlasher(byId('status'), 1500);
 const saver = createSettingsSaver(settingsStore, chrome.storage, { onSaved: () => flash('Saved') });
+
+// "Never close tabs from these sites", as chrome://settings/performance lists the sites Memory Saver
+// keeps active: Add asks in a dialog; each site has a ⋮ menu with Edit and Remove.
+const keepSites = createSiteList({
+  list: byId('site-list'),
+  empty: byId('no-sites'),
+  addButton: byId('add-site'),
+  parse: siteHost,
+  add: (site) => save({ keepSites: [...settings.keepSites.filter((s) => s !== site), site] }),
+  remove: (site) => save({ keepSites: settings.keepSites.filter((s) => s !== site) }),
+  replace: (site, edited) => save({ keepSites: [...new Set(settings.keepSites.map((s) => (s === site ? edited : s)))] }),
+});
 
 /**
  * A settings row: a label and its control.
@@ -107,7 +118,7 @@ function renderForm() {
   autoClose.checked = settings.autoClose;
   autoCloseHours.value = String(settings.autoCloseHours);
   byId('auto-close-options').hidden = !settings.autoClose;
-  renderSites(settings.keepSites);
+  keepSites.render(settings.keepSites);
 }
 
 windowScope.addEventListener('change', () => save({ windowScope: windowScope.value }));
@@ -115,7 +126,6 @@ includeGroupedTabs.addEventListener('change', () => save({ includeGroupedTabs: i
 reopenGroups.addEventListener('change', () => save({ reopenGroups: reopenGroups.checked }));
 autoClose.addEventListener('change', () => save({ autoClose: autoClose.checked }));
 autoCloseHours.addEventListener('change', () => save({ autoCloseHours: autoCloseHours.value }));
-startSites(() => settings, (keepSites) => save({ keepSites }));
 byId('memory-saver').addEventListener('click', () => {
   chrome.tabs.create({ url: 'chrome://settings/performance' });
 });

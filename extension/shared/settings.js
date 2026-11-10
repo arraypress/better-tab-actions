@@ -13,8 +13,7 @@
  * @module shared/settings
  */
 
-import { createSettingsStore, MAX_SYNC_ITEM_BYTES } from '../vendor/extension-kit/index.js';
-import { siteFromInput } from './sites.js';
+import { createSettingsStore, MAX_SYNC_ITEM_BYTES, siteHost } from '../vendor/extension-kit/index.js';
 
 /**
  * @typedef {object} Settings
@@ -45,7 +44,7 @@ export const AUTO_CLOSE_HOURS = /** @type {readonly number[]} */ (Object.freeze(
  * @returns {string[]} The sites.
  */
 function keepSitesFrom(raw) {
-  const sites = [...new Set((Array.isArray(raw) ? raw : []).flatMap((site) => (typeof site === 'string' ? siteFromInput(site) ?? [] : [])))];
+  const sites = [...new Set((Array.isArray(raw) ? raw : []).flatMap((site) => (siteHost(site) ?? [])))];
   /** @type {string[]} */
   const kept = [];
   for (const site of sites) {

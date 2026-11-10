@@ -121,8 +121,8 @@ more-tab-actions/
 │   │                           actions), auto-close.js, recent.js
 │   ├── offscreen/              offscreen.html/.js: tells the worker Chrome's light or dark mode
 │   ├── options/                the settings page, styled like chrome://settings: options.html/
-│   │                           .css/.js, workspaces-section.js, keep-sites.js, about-links.js
-│   │                           (⋮ menus, the one-field dialog and toasts are the kit's)
+│   │                           .css/.js, workspaces-section.js, about-links.js (⋮ menus,
+│   │                           the one-field dialog, toasts and the site list are the kit's)
 │   ├── shared/                 loaded by the worker and the pages: actions.js (what each action
 │   │                           does), workspaces.js, settings.js, sites.js, text.js, undo.js
 │   ├── vendor/extension-kit/   @arraypress/extension-kit's browser half, copied in by npm install
@@ -130,7 +130,7 @@ more-tab-actions/
 │   └── icons/                  the extension icons, and toolbar/ (the light and dark glyph)
 ├── test/                       unit tests (node --test, against a fake browser), and e2e/
 │                               (Playwright checks in real Chromium)
-├── scripts/                    packaging and toolbar icon rendering
+├── scripts/                    packaging (the kit renders the toolbar icons)
 ├── store/                      Chrome Web Store screenshots and promo tile, and tools/ that make them
 └── docs/
     └── bug-report/             a write-up of a Chrome bug (separators are dropped in tab menu submenus)

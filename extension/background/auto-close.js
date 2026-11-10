@@ -13,8 +13,9 @@
  * @module background/auto-close
  */
 import { unused } from '../shared/actions.js';
-import { onListedSite, tabUrl } from '../shared/sites.js';
+import { tabUrl } from '../shared/sites.js';
 import { recordClosed } from '../shared/undo.js';
+import { onSite, siteHost } from '../vendor/extension-kit/index.js';
 
 /** @import { Settings } from '../shared/settings.js' */
 /** @import { Tab } from '../shared/sites.js' */
@@ -60,7 +61,7 @@ export function unusedTabs(tabs, settings, now) {
   if (!settings.autoClose) return [];
   const ageMs = settings.autoCloseHours * HOUR_MS;
   return tabs.filter((tab) =>
-    !tab.incognito && unused(tab, settings, now, ageMs) && !onListedSite(tabUrl(tab), settings.keepSites));
+    !tab.incognito && unused(tab, settings, now, ageMs) && !onSite(siteHost(tabUrl(tab)), settings.keepSites));
 }
 
 /**

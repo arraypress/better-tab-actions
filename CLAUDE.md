@@ -8,7 +8,7 @@ follow the user through their own Chrome Sync (plain preferences, not personal d
 receives nothing); `chrome.storage.local` holds the saved workspaces (below) and a write sync refused, until it's retried (by the options
 page, and by the worker at start). The options page debounces its writes (sync allows 120 a minute).
 The About card's links are in `options/about-links.js` (`githubAboutLinks`; `npm run package`
-warns loudly if one is ever a placeholder). `npm test` (ESLint; `tsc`, a strict check of the JSDoc types;
+warns loudly if one is ever a placeholder). `npm test` (`extension-kit vendor-check`, which fails while `vendor/` is stale; ESLint; `tsc`, a strict check of the JSDoc types;
 node --test; and `extension-kit duplication`, which fails on copied code not listed in `.jscpd-allowlist.json`), `npm run package` (tests, zip, link reminders),
 `npm run e2e` (Playwright checks in real Chromium, `test/e2e/`: the group actions, workspaces, automatic closing, the options page and the toolbar glyph; not part of `npm test`).
 `test/package.test.js` checks the zip is exactly `extension/` (less the SVG sources) and that every path the extension names resolves inside it.
@@ -56,8 +56,8 @@ closes tabs `unused()` (shared with "Close tabs not used in N days" in `shared/a
 (1, 4, 12, 24, 72, 168; `AUTO_CLOSE_HOURS` in settings.js), in normal windows, never incognito, never on
 `keepSites` (or their subdomains). Closed tabs are *appended* to the undo batch (`recordClosed(..., {append: true})`,
 capped at 500) so earlier automatic closes stay reopenable; a menu action still starts a new batch. Sites are
-typed into the kit's one-field dialog (`askText`, as "Rename workspace" is) and listed by `options/keep-sites.js`, as
-chrome://settings/performance lists Memory Saver's sites; the list is cut to fit one sync item. Memory Saver is
+typed into the kit's one-field dialog and listed by its `createSiteList` (Add button, ⋮ Edit/Remove; `siteHost` keeps
+hosts, `onSite` matches subdomains), as chrome://settings/performance lists Memory Saver's sites; the list is cut to fit one sync item. Memory Saver is
 only linked, never reimplemented.
 - **Camera, mic, screen.** Chrome exposes no capture state to extensions: with fake devices in Chromium 156, a
   tab using `getUserMedia` (camera and mic) or `getDisplayMedia` showed no change in any `chrome.tabs.Tab` field

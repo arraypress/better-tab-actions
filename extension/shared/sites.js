@@ -1,7 +1,8 @@
 /**
  * What a tab's address says: the site it belongs to, the page it shows, and
  * the address itself while it's still loading. Shared by the actions and the
- * closed-tab batch.
+ * closed-tab batch. Sites typed into a list, and whether a tab is on one, are
+ * the kit's (`siteHost`, `onSite`).
  *
  * @module shared/sites
  */
@@ -13,9 +14,6 @@
  *
  * @typedef {Omit<chrome.tabs.Tab, 'lastAccessed'> & {lastAccessed?: number}} Tab
  */
-
-/** The longest host name DNS allows, and so the longest site the site field takes. */
-export const MAX_HOST_LENGTH = 253;
 
 /**
  * The site a URL belongs to, or null for non-web pages (chrome://, file://, etc.).
@@ -81,37 +79,4 @@ export function mainSite(tabs) {
   }
   const [first, second] = [...counts].sort((a, b) => b[1] - a[1]);
   return first && (!second || first[1] > second[1]) ? first[0] : null;
-}
-
-/**
- * The site someone typed into a site list: a host ("github.com"), or an address whose host is
- * taken ("https://www.github.com/a" → "github.com"). "www." is dropped, as {@link siteKey} does.
- *
- * @param {string} text - What was typed.
- * @returns {string | null} The site, or null when it isn't a web host (no dot, a space, a scheme
- *   other than http or https…).
- * @example
- * siteFromInput(' https://www.GitHub.com/a '); // 'github.com'
- * siteFromInput('not a site'); // null
- */
-export function siteFromInput(text) {
-  const trimmed = text.trim();
-  if (!trimmed || /\s/.test(trimmed)) return null;
-  const key = siteKey(/^[a-z][a-z\d+.-]*:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`);
-  return key && (key.includes('.') || key === 'localhost') && !key.endsWith('.') ? key : null;
-}
-
-/**
- * Whether an address is on one of the listed sites, or a subdomain of one ("docs.github.com" is
- * on "github.com").
- *
- * @param {string} url - A tab's address.
- * @param {readonly string[]} sites - Sites, as {@link siteFromInput} gives them.
- * @returns {boolean} True when it's on one of them.
- * @example
- * onListedSite('https://docs.github.com/x', ['github.com']); // true
- */
-export function onListedSite(url, sites) {
-  const key = siteKey(url);
-  return key !== null && sites.some((site) => key === site || key.endsWith(`.${site}`));
 }

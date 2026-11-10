@@ -15,17 +15,15 @@
  * @module test/e2e/auto-close
  */
 import assert from 'node:assert/strict';
-import { cp, readFile, rm, writeFile } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
+import { readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { until, warningsAddedBy } from '@arraypress/extension-kit/testing';
+import { buildTestCopy } from '@arraypress/extension-kit/build';
+import { testBuildDir, until, warningsAddedBy } from '@arraypress/extension-kit/testing';
 import { click, EXTENSION, openWindow, serveExampleSites, testProfile } from './helpers.mjs';
 
 /** @import { Worker } from 'playwright' */
 
-const build = fileURLToPath(new URL('../../.test-builds/auto-close', import.meta.url));
-await rm(build, { recursive: true, force: true });
-await cp(EXTENSION, build, { recursive: true });
+const build = await buildTestCopy({ from: EXTENSION, to: testBuildDir(path.dirname(EXTENSION), 'auto-close') });
 const moduleFile = path.join(build, 'background', 'auto-close.js');
 const source = await readFile(moduleFile, 'utf8');
 const fast = source
