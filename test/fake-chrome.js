@@ -7,6 +7,7 @@
  * @module test/fake-chrome
  */
 import { EXTENSION_ID, fakeBrowser } from './fake-browser.js';
+import { I18N } from './helpers.js';
 
 /** @import { AlarmsApi } from '../extension/background/auto-close.js' */
 /** @import { TabSeed } from './fake-browser.js' */
@@ -166,7 +167,7 @@ export function fakeAlarms(now = 0) {
  * A whole `chrome` for the service worker: the fake browser's tabs, windows, tab groups and
  * storage, firing the events Chrome fires when they change (a tab created, removed, activated,
  * muted, pinned or grouped; a window focused), plus the menu, alarms, commands, the toolbar
- * button and the runtime's install and start-up events.
+ * button, the runtime's install and start-up events, and the extension's real words (`_locales`).
  *
  * @param {TabSeed[]} tabs - The open tabs (see `fakeBrowser`).
  * @param {Parameters<typeof fakeBrowser>[1]} [options] - The windows (see `fakeBrowser`).
@@ -239,6 +240,7 @@ export function fakeChrome(tabs, options) {
     tabGroups: browser.tabGroups,
     extension: browser.extension,
     storage: browser.storage,
+    i18n: I18N,
     contextMenus,
     alarms,
     commands: { onCommand: /** @type {ReturnType<typeof fakeEvent<[string, chrome.tabs.Tab?]>>} */ (fakeEvent()) },

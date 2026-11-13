@@ -79,6 +79,36 @@ await runChecks(runner, async () => {
     await page.close();
   });
 
+  await check('Chrome reads the words from _locales: the manifest’s name, toolbar title and commands, and the page’s title, headings and bold menu names', async () => {
+    const manifest = await worker.evaluate(async () => ({
+      name: chrome.runtime.getManifest().name,
+      description: chrome.runtime.getManifest().description,
+      toolbar: await chrome.action.getTitle({}),
+      commands: (await chrome.commands.getAll()).filter((command) => command.name !== '_execute_action').map((command) => command.description),
+    }));
+    assert.equal(manifest.name, 'Better Tab Actions');
+    assert.match(manifest.description ?? '', /^More actions for Chrome’s tab right-click menu/);
+    assert.equal(manifest.toolbar, 'Better Tab Actions settings');
+    assert.equal(manifest.commands.length, 14);
+    assert.ok(manifest.commands.includes('Switch to last used tab') && manifest.commands.includes('Close tabs from this site'));
+    assert.deepEqual(manifest.commands.filter((description) => !description || description.includes('__MSG_')), []);
+
+    const page = await open();
+    assert.equal(await page.title(), 'Better Tab Actions settings');
+    assert.equal(await page.locator('h1').innerText(), 'Better Tab Actions');
+    assert.deepEqual(await page.locator('h2').allInnerTexts(), ['Menu', 'Workspaces', 'Closing tabs', 'Keyboard shortcuts', 'About Better Tab Actions']);
+    assert.equal(await page.locator('#menu-intro').innerText(), 'Choose what appears under More tab actions when you right-click a tab. Hidden actions still work from keyboard shortcuts.');
+    assert.deepEqual(await page.locator('#menu-intro strong').allInnerTexts(), ['More tab actions']);
+    assert.equal(await page.locator('#no-workspaces-text').innerText(), 'Workspaces you save appear here. To save your windows, right-click a tab and choose More tab actions › Save windows as workspace.');
+    assert.deepEqual(await page.locator('#no-workspaces-text strong').allInnerTexts(), ['More tab actions', 'Save windows as workspace']);
+    assert.equal(await page.locator('#workspaces-full-text').textContent(), 'You can keep up to 40 workspaces. Delete one to save another.');
+    assert.deepEqual(await page.locator('#windowScope option').allInnerTexts(), ['This window only', 'All windows']);
+    // Nothing on the page is left without its words, or showing a message's key.
+    assert.deepEqual(await page.locator('[data-i18n]').evaluateAll((elements) => elements.filter((element) => !element.textContent?.trim() || element.textContent === element.getAttribute('data-i18n')).map((element) => element.getAttribute('data-i18n'))), []);
+    assert.equal(await page.evaluate(() => document.documentElement.lang), 'en-GB');
+    await page.close();
+  });
+
   await check('no keyboard shortcut is set by default: the card says so and leads to Chrome’s page', async () => {
     const page = await open();
     assert.equal(await page.locator('#shortcuts .row').count(), 0);

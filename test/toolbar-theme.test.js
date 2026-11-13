@@ -31,7 +31,8 @@ test('manifest starts on the light glyph, keeps its brand icons, asks for offscr
 test('the worker starts the theme, the offscreen document watches, the options page reports', () => {
   assert.match(read('background/background.js'), /startToolbarTheme\(chrome\)/);
   assert.match(read('offscreen/offscreen.js'), /watchSchemeOffscreen\(chrome\.runtime\)/);
-  assert.match(read('options/options.js'), /watchColorScheme\(chrome\)/);
+  // The options page reports through the kit's setUpPage, which starts watchColorScheme.
+  assert.match(read('options/options.js'), /setUpPage\(chrome, /);
 });
 
 test('toolbarDark: this computer’s, never synced (saving and loading leave it in local)', async () => {

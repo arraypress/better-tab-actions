@@ -6,13 +6,15 @@
  * @module shared/actions
  */
 import { mainSite, siteKey, tabUrl, pageKey } from './sites.js';
-import { plural, shortDate } from './text.js';
+import { counted } from '../vendor/extension-kit/index.js';
+import { shortDate } from './text.js';
 import { DEFAULTS } from './settings.js';
 import { recordClosed, reopenClosed } from './undo.js';
 import { loadWorkspaces, MAX_WORKSPACES, MENU_WORKSPACES, openWorkspace, saveWorkspace } from './workspaces.js';
 
 /** @import { Tab } from './sites.js' */
 /** @import { Settings } from './settings.js' */
+/** @import { Words } from './text.js' */
 /** @import { UndoApis } from './undo.js' */
 /** @import { WorkspaceApis } from './workspaces.js' */
 
@@ -54,18 +56,19 @@ import { loadWorkspaces, MAX_WORKSPACES, MENU_WORKSPACES, openWorkspace, saveWor
  */
 
 /**
- * A menu action. `title` is also the shortcut description in manifest.json; `menuTitle`
- * overrides it in the menu, `enabled` can grey it out, and `children` makes it a submenu. An
- * action either has a `plan`, or is `reopen: true` and reopens the last closed batch, or has a
- * `workspace` job: save every window, save the clicked one, or open a workspace.
+ * A menu action. `message` is its name's key in `_locales` (the same message is its shortcut's
+ * description in manifest.json); `menuTitle` overrides it in the menu, `enabled` can grey it out,
+ * and `children` makes it a submenu. An action either has a `plan`, or is `reopen: true` and
+ * reopens the last closed batch, or has a `workspace` job: save every window, save the clicked
+ * one, or open a workspace.
  *
  * @typedef {{
  *   id: string,
- *   title: string,
+ *   message: string,
  *   section: number,
- *   menuTitle?: (settings: Settings, state: MenuState) => string,
+ *   menuTitle?: (words: Words, settings: Settings, state: MenuState) => string,
  *   enabled?: (state: MenuState) => boolean,
- *   children?: (state: MenuState) => MenuEntry[],
+ *   children?: (state: MenuState, words: Words) => MenuEntry[],
  * } & (
  *   | {plan: (target: Tab, tabs: Tab[], ctx: PlanContext) => Plan, reopen?: undefined, workspace?: undefined}
  *   | {reopen: true, plan?: undefined, workspace?: undefined}
@@ -80,8 +83,12 @@ import { loadWorkspaces, MAX_WORKSPACES, MENU_WORKSPACES, openWorkspace, saveWor
  *   | {separator: true, id?: undefined, title?: undefined, enabled?: undefined, children?: undefined}} MenuEntry
  */
 
+/** The submenu's title's key in `_locales`: “More tab actions”, as Chrome words its own “More …” entries. */
+export const MENU_MESSAGE = 'menuMoreTabActions';
 /** The command "Switch to last used tab": a keyboard shortcut only, with no menu item (background/worker.js runs it). */
 export const SWITCH_LAST = 'switch-last-tab';
+/** Its name's key in `_locales`. */
+export const SWITCH_LAST_MESSAGE = 'actionSwitchLastTab';
 /** How the "Open workspace" submenu names one workspace's item: this, then the workspace's id. */
 export const WORKSPACE_ITEM_PREFIX = 'open-workspace:';
 /** The "Open workspace" submenu's last item, to the settings page's Workspaces card. */
@@ -369,28 +376,28 @@ function sortMoves(target, tabs) {
 export const ACTIONS = [
   {
     id: 'close-site-tabs',
-    title: 'Close tabs from this site',
+    message: 'actionCloseSiteTabs',
     section: 1,
     plan: (target, tabs, { settings }) => close(sameSite(target, tabs, settings)),
   },
   {
     id: 'close-other-site-tabs',
-    title: 'Close other tabs from this site',
+    message: 'actionCloseOtherSiteTabs',
     section: 1,
     plan: (target, tabs, { settings }) =>
       close(sameSite(target, tabs, settings).filter((tab) => tab.id !== target.id)),
   },
   {
     id: 'close-duplicate-tabs',
-    title: 'Close duplicate tabs',
+    message: 'actionCloseDuplicateTabs',
     section: 1,
     plan: (target, tabs, { settings }) => close(duplicates(target, tabs, settings)),
   },
   {
     // Skips active tabs, playing tabs, and tabs with no last-used time.
     id: 'close-inactive-tabs',
-    title: 'Close inactive tabs',
-    menuTitle: ({ inactiveDays }) => `Close tabs not used in ${plural(inactiveDays, 'day')}`,
+    message: 'actionCloseInactiveTabs',
+    menuTitle: (words, { inactiveDays }) => counted(inactiveDays, 'menuCloseInactiveOne', 'menuCloseInactive', words),
     section: 1,
     plan: (target, tabs, { now, settings }) =>
       close(inScope(target, tabs, settings).filter((tab) => unused(tab, settings, now, settings.inactiveDays * DAY_MS))),
@@ -398,7 +405,7 @@ export const ACTIONS = [
   {
     // Same window only, like Chrome's own "Close tabs to the right".
     id: 'close-tabs-to-left',
-    title: 'Close tabs to the left',
+    message: 'actionCloseTabsToLeft',
     section: 1,
     plan: (target, tabs, { settings }) =>
       close(
@@ -410,9 +417,9 @@ export const ACTIONS = [
   },
   {
     id: 'reopen-closed-tabs',
-    title: 'Reopen closed tabs',
-    menuTitle: (settings, { closedCount }) =>
-      closedCount ? `Reopen ${plural(closedCount, 'closed tab')}` : 'Reopen closed tabs',
+    message: 'actionReopenClosedTabs',
+    menuTitle: (words, settings, { closedCount }) =>
+      (closedCount ? counted(closedCount, 'menuReopenOne', 'menuReopen', words) : words.t('actionReopenClosedTabs')),
     enabled: ({ closedCount }) => closedCount > 0,
     section: 1,
     reopen: true,
@@ -420,7 +427,7 @@ export const ACTIONS = [
   {
     // This window only; tabs keep their groups (see sortMoves).
     id: 'sort-tabs-by-site',
-    title: 'Sort tabs by site',
+    message: 'actionSortTabsBySite',
     section: 2,
     plan: (target, tabs) => {
       const moves = sortMoves(target, tabs);
@@ -431,8 +438,8 @@ export const ACTIONS = [
     // Toggles: if any tabs are muted by this extension, unmute them (never touching tabs the
     // user muted); otherwise mute every other tab playing sound, in all windows.
     id: 'mute-other-tabs',
-    title: 'Mute or unmute other tabs',
-    menuTitle: (settings, { mutedByUs }) => (mutedByUs ? 'Unmute tabs' : 'Mute other tabs'),
+    message: 'actionMuteOtherTabs',
+    menuTitle: ({ t }, settings, { mutedByUs }) => (mutedByUs ? t('menuUnmuteTabs') : t('menuMuteOtherTabs')),
     section: 2,
     plan: (target, tabs, { extensionId }) => {
       const ours = tabs.filter((tab) => mutedByExtension(tab, extensionId));
@@ -448,7 +455,7 @@ export const ACTIONS = [
     // also appears in saved groups. Groups already in the window stay as they are; pinned tabs
     // stay pinned and ungrouped.
     id: 'save-window-as-group',
-    title: 'Save this window as a group',
+    message: 'actionSaveWindowAsGroup',
     enabled: ({ ungroupedTabs }) => ungroupedTabs > 0,
     section: 3,
     plan: groupWindow,
@@ -461,7 +468,7 @@ export const ACTIONS = [
     // - it's an incognito window, where Chrome saves no groups.
     // The closed batch for "Reopen closed tabs" is left alone: the saved group is the way back.
     id: 'close-window-keep-group',
-    title: 'Close window and keep as group',
+    message: 'actionCloseWindowKeepGroup',
     enabled: ({ ungroupedTabs, pinnedTabs, incognito }) => ungroupedTabs > 0 && !pinnedTabs && !incognito,
     section: 3,
     plan: (target, tabs, ctx) => {
@@ -474,7 +481,7 @@ export const ACTIONS = [
     // Every normal window of this profile (not incognito, popup or app windows). Greyed out once
     // MAX_WORKSPACES are kept.
     id: 'save-workspace',
-    title: 'Save windows as workspace',
+    message: 'actionSaveWorkspace',
     enabled: ({ workspaces }) => workspaces.length < MAX_WORKSPACES,
     section: 4,
     workspace: 'save',
@@ -482,7 +489,7 @@ export const ACTIONS = [
   {
     // Not offered in incognito, whose tabs aren't kept.
     id: 'save-window-workspace',
-    title: 'Save this window as workspace',
+    message: 'actionSaveWindowWorkspace',
     enabled: ({ workspaces, incognito }) => workspaces.length < MAX_WORKSPACES && !incognito,
     section: 4,
     workspace: 'save-window',
@@ -491,14 +498,14 @@ export const ACTIONS = [
     // In the menu, a submenu of the latest workspaces, then "Manage workspaces". As a keyboard
     // shortcut, it opens the most recently saved one.
     id: 'open-workspace',
-    title: 'Open last workspace',
-    menuTitle: () => 'Open workspace',
+    message: 'actionOpenWorkspace',
+    menuTitle: ({ t }) => t('menuOpenWorkspace'),
     enabled: ({ workspaces }) => workspaces.length > 0,
-    children: ({ workspaces }) => workspaces.length
+    children: ({ workspaces }, { t }) => workspaces.length
       ? [
         ...workspaces.slice(0, MENU_WORKSPACES).map(({ id, name }) => ({ id: `${WORKSPACE_ITEM_PREFIX}${id}`, title: name, enabled: true })),
         { separator: true },
-        { id: MANAGE_WORKSPACES, title: 'Manage workspaces', enabled: true },
+        { id: MANAGE_WORKSPACES, title: t('menuManageWorkspaces'), enabled: true },
       ]
       : [],
     section: 4,
@@ -512,25 +519,27 @@ const actionsById = new Map(ACTIONS.map((action) => [action.id, action]));
  * The label an action shows in the menu.
  *
  * @param {Action} action - One of {@link ACTIONS}.
+ * @param {Words} words - The extension's words.
  * @param {Settings} [settings] - The user's settings. Default {@link DEFAULTS}.
  * @param {MenuState} [state] - The live state. Default {@link NO_STATE}.
  * @returns {string} The label.
  * @example
- * menuTitle(inactiveAction, { ...DEFAULTS, inactiveDays: 1 }); // 'Close tabs not used in 1 day'
+ * menuTitle(inactiveAction, words, { ...DEFAULTS, inactiveDays: 1 }); // 'Close tabs not used in 1 day'
  */
-export function menuTitle(action, settings = DEFAULTS, state = NO_STATE) {
-  return action.menuTitle ? action.menuTitle(settings, state) : action.title;
+export function menuTitle(action, words, settings = DEFAULTS, state = NO_STATE) {
+  return action.menuTitle ? action.menuTitle(words, settings, state) : words.t(action.message);
 }
 
 /**
  * The submenu contents: visible actions in order, with a separator between sections that both
  * have visible items.
  *
+ * @param {Words} words - The extension's words.
  * @param {Settings} [settings] - The user's settings. Default {@link DEFAULTS}.
  * @param {MenuState} [state] - The live state. Default {@link NO_STATE}.
  * @returns {MenuEntry[]} The entries; [] when every action is hidden.
  */
-export function menuEntries(settings = DEFAULTS, state = NO_STATE) {
+export function menuEntries(words, settings = DEFAULTS, state = NO_STATE) {
   const hidden = new Set(settings.hiddenActions);
   /** @type {MenuEntry[]} */
   const entries = [];
@@ -543,10 +552,10 @@ export function menuEntries(settings = DEFAULTS, state = NO_STATE) {
     /** @type {MenuEntry} */
     const entry = {
       id: action.id,
-      title: menuTitle(action, settings, state),
+      title: menuTitle(action, words, settings, state),
       enabled: action.enabled ? action.enabled(state) : true,
     };
-    const children = action.children?.(state) ?? [];
+    const children = action.children?.(state, words) ?? [];
     if (children.length) entry.children = children;
     entries.push(entry);
   }

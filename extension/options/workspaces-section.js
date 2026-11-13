@@ -14,6 +14,8 @@ import {
 } from '../shared/workspaces.js';
 
 /** @import { Settings } from '../shared/settings.js' */
+/** @import { Words } from '../shared/text.js' */
+/** @import { Toast } from '../vendor/extension-kit/index.js' */
 /** @import { Workspace } from '../shared/workspaces.js' */
 
 const apis = browserApis(chrome);
@@ -21,10 +23,13 @@ const list = byId('workspace-list');
 const empty = byId('no-workspaces');
 const full = byId('workspaces-full');
 const menu = createMenu();
-const toast = createToast();
 
-/** The page's current settings (for "Reopen tab groups"), from {@link startWorkspaces}. */
+/** The page's current settings (for "Reopen tab groups"), its words, and its toast: all from {@link startWorkspaces}. */
 let settings = /** @type {() => Settings} */ (() => { throw new Error('startWorkspaces first'); });
+/** @type {Words} */
+let words;
+/** @type {Toast} */
+let toast;
 
 /**
  * Put the workspace back as it was (after "Delete" or "Replace with current windows").
@@ -45,15 +50,19 @@ async function act(workspace, command) {
   if (command === 'open') {
     await runAction('open-workspace', undefined, apis, { settings: settings(), workspaceId: workspace.id });
   } else if (command === 'rename') {
-    const name = await askText({ title: 'Rename workspace', label: 'Name', value: workspace.name, action: 'Save', maxLength: MAX_NAME_LENGTH });
+    const { t } = words;
+    const name = await askText({
+      title: t('workspaceRenameTitle'), label: t('workspaceNameLabel'), value: workspace.name,
+      action: t('optionsSave'), cancel: t('optionsCancel'), maxLength: MAX_NAME_LENGTH,
+    });
     if (name) await updateWorkspaces(chrome.storage.local, (all) => all.map((w) => (w.id === workspace.id ? { ...w, name } : w)));
   } else if (command === 'replace') {
     const page = await chrome.tabs.getCurrent();
     const old = await replaceWorkspace(apis, workspace.id, { now: Date.now(), leaveOut: page?.id });
-    if (old) toast.show(`Replaced “${old.name}” with your current windows`, () => restore(old));
+    if (old) toast.show(words.t('toastReplaced', [old.name]), () => restore(old));
   } else {
     await updateWorkspaces(chrome.storage.local, (all) => all.filter((w) => w.id !== workspace.id));
-    toast.show(`Deleted “${workspace.name}”`, () => restore(workspace));
+    toast.show(words.t('toastDeleted', [workspace.name]), () => restore(workspace));
   }
 }
 
@@ -67,14 +76,16 @@ function workspaceRow(workspace) {
   const row = make('li', 'row two-line');
   row.dataset.id = workspace.id;
   const label = make('span', 'label');
-  label.append(make('span', '', workspace.name), make('span', 'secondary', workspaceSummary(workspace, Date.now())));
+  const { t } = words;
+  label.append(make('span', '', workspace.name), make('span', 'secondary', workspaceSummary(workspace, Date.now(), words)));
 
   row.append(label, moreActionsButton(workspace.name, {
+    label: t('optionsMoreActions', [workspace.name]),
     onClick: (anchor) => menu.open([
-      { label: 'Open', run: () => act(workspace, 'open') },
-      { label: 'Rename', run: () => act(workspace, 'rename') },
-      { label: 'Replace with current windows', run: () => act(workspace, 'replace') },
-      { label: 'Delete', run: () => act(workspace, 'delete') },
+      { label: t('workspaceOpen'), run: () => act(workspace, 'open') },
+      { label: t('workspaceRename'), run: () => act(workspace, 'rename') },
+      { label: t('workspaceReplace'), run: () => act(workspace, 'replace') },
+      { label: t('workspaceDelete'), run: () => act(workspace, 'delete') },
     ], { anchor }),
   }));
   return row;
@@ -106,10 +117,13 @@ async function render() {
  * Wire up the card.
  *
  * @param {() => Settings} current - The page's current settings (for "Reopen tab groups").
+ * @param {Words} pageWords - The page's words.
  * @returns {Promise<void>} Settles once the list is shown.
  */
-export async function startWorkspaces(current) {
+export async function startWorkspaces(current, pageWords) {
   settings = current;
+  words = pageWords;
+  toast = createToast({ undoLabel: words.t('toastUndo') });
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === 'local' && WORKSPACES_KEY in changes) render();
   });

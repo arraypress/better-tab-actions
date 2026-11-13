@@ -12,16 +12,17 @@
  * @module background/worker
  */
 import {
-  browserApis, MANAGE_WORKSPACES, menuEntries, menuState, runAction, SWITCH_LAST, WORKSPACE_ITEM_PREFIX,
+  browserApis, MANAGE_WORKSPACES, MENU_MESSAGE, menuEntries, menuState, runAction, SWITCH_LAST, WORKSPACE_ITEM_PREFIX,
 } from '../shared/actions.js';
 import { settingsStore } from '../shared/settings.js';
 import { CLOSED_KEY, closedCount } from '../shared/undo.js';
+import { wordsOf } from '../shared/text.js';
 import { loadWorkspaces, WORKSPACES_KEY } from '../shared/workspaces.js';
 import { AUTO_CLOSE_ALARM, closeUnusedTabs, scheduleAutoClose } from './auto-close.js';
-import { createMenuKeeper } from './menu.js';
+import { createMenuKeeper, menuItems } from './menu.js';
 import { forget, lastUsed, loadRecent, noteUsed, RECENT_KEY } from './recent.js';
 
-/** @import { MenuEntry } from '../shared/actions.js' */
+/** @import { MenuItem } from './menu.js' */
 
 /** The settings page's Workspaces card, where "Manage workspaces" goes. */
 export const WORKSPACES_PAGE = 'options/options.html#workspaces';
@@ -57,12 +58,13 @@ const logFailure = (what) => (error) => console.error(`${what}:`, error);
  */
 export function startWorker(api) {
   const browser = browserApis(api);
+  const words = wordsOf(api.i18n);
 
   /**
-   * The submenu as it should look now: the settings, the open tabs, the closed batch, the focused
-   * window and the saved workspaces.
+   * The menu as it should look now: the settings, the open tabs, the closed batch, the focused
+   * window and the saved workspaces, in Chrome's language.
    *
-   * @returns {Promise<MenuEntry[]>} The entries.
+   * @returns {Promise<MenuItem[]>} The items.
    */
   async function currentMenu() {
     const [settings, tabs, count, [focused], workspaces] = await Promise.all([
@@ -73,7 +75,8 @@ export function startWorker(api) {
       api.tabs.query({ active: true, lastFocusedWindow: true }),
       loadWorkspaces(api.storage.local),
     ]);
-    return menuEntries(settings, menuState(tabs, count, api.runtime.id, focused?.windowId, workspaces));
+    const state = menuState(tabs, count, api.runtime.id, focused?.windowId, workspaces);
+    return menuItems(menuEntries(words, settings, state), words.t(MENU_MESSAGE));
   }
   const menu = createMenuKeeper(api, currentMenu);
 

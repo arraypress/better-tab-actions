@@ -11,13 +11,12 @@ and `store/` never reach the store.
 
 **Extension Name** [REQUIRED] (16/75)
 Better Tab Actions
-<!-- The store takes the title from manifest.json "name". A longer title, e.g.
-     "Better Tab Actions – Close Tabs by Site & Duplicates", would mean changing the manifest. -->
+<!-- The store takes the title from the manifest's "name", which is the message `extName` in
+     `extension/_locales/en/messages.json`. A longer title, e.g. "Better Tab Actions – Close Tabs by
+     Site & Duplicates", goes there (`extShortName` stays the short one). -->
 
-**Short Description** [REQUIRED] (129/132, from manifest.json "description")
+**Short Description** [REQUIRED] (129/132, the message `extDescription` in `_locales`; en_GB has the same)
 More actions for Chrome’s tab right-click menu: close tabs by site, duplicates, inactive tabs, mute tabs, save windows as groups.
-<!-- The store shows the manifest's text. Wording rules want a curly apostrophe (Chrome’s);
-     change manifest.json if you want that, it isn't behaviour. -->
 
 **Detailed Description** [REQUIRED] (plain text, paste as-is)
 
@@ -68,7 +67,7 @@ Make Chrome Yours › Functionality & UI (alternative: Productivity › Tools).
 Adds extra actions for tabs to Chrome’s tab right-click menu (closing tabs by site, duplicate or unused tabs, reopening them, sorting tabs by site, muting other tabs, putting a window’s tabs into a tab group, and saving windows as a workspace to reopen later), optionally closing unused tabs by itself, with commands for the same actions that the user can give keyboard shortcuts, plus one to switch back to the last used tab.
 
 **Primary Language** [REQUIRED]
-English.
+English (the extension's `default_locale` is `en`; `en_GB` is included).
 
 **Homepage URL** [OPTIONAL]: an ArrayPress page for the extension, if there is one.
 **Support email** [OPTIONAL]: support@arraypress.com (“for now”; also in `PRIVACY.md`’s Contact. Bug reports go to the repo’s GitHub Issues).
@@ -174,7 +173,7 @@ repo is public). The policy is `PRIVACY.md`; the draft below is a shorter versio
 
 **Build:**
 - [ ] `npm run package` (tests, kit check, zip). The zip is exactly the contents of `extension/`, less the toolbar glyph's SVG sources (`test/package.test.js` checks this):
-      `unzip -l release/better-tab-actions.zip` should list `manifest.json` at the root, then `background/`, `offscreen/`, `options/`, `shared/`, `vendor/` (the kit's browser half) and `icons/` (PNGs only); no `store/`, `test/`, `scripts/` or `docs/`, and no `e2e-hook.js` (that's the test builds').
+      `unzip -l release/better-tab-actions.zip` should list `manifest.json` at the root, then `_locales/` (en, en_GB), `background/`, `offscreen/`, `options/`, `shared/`, `vendor/` (the kit's browser half) and `icons/` (PNGs only); no `store/`, `test/`, `scripts/` or `docs/`, and no `e2e-hook.js` (that's the test builds').
 - [ ] **No placeholder links.** `extension/options/about-links.js` points at the GitHub repo (README, Issues, PRIVACY.md); `npm run package` warns loudly if any link is ever set back to example.com.
 - [ ] Load the `extension/` folder in a clean profile and right-click a tab: the submenu and the settings page work; set a key at chrome://extensions/shortcuts and check it runs its action and shows on the settings page.
 

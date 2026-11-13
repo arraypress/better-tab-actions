@@ -37,13 +37,14 @@ import { MENU, MENU_CSS, MENU_ICONS, menu, tabLayout, tabMarks } from './frame.m
 /** @import { MenuEntry } from '../../extension/shared/actions.js' */
 /** @import * as Actions from '../../extension/shared/actions.js' */
 /** @import * as SettingsModule from '../../extension/shared/settings.js' */
+/** @import * as TextModule from '../../extension/shared/text.js' */
 /** @import * as WorkspacesModule from '../../extension/shared/workspaces.js' */
 
 /**
  * The extension's own modules, as the options page imports them (relative to options/), for
  * code run inside it.
  */
-const MODULES = { actions: '../shared/actions.js', settings: '../shared/settings.js', workspaces: '../shared/workspaces.js' };
+const MODULES = { actions: '../shared/actions.js', settings: '../shared/settings.js', text: '../shared/text.js', workspaces: '../shared/workspaces.js' };
 
 const { H, THEMES, W, WIN, canvas, cursor, geometry, letterIcon, windowChrome } = storeFrame;
 const ZOOMED = geometry(1.2);
@@ -172,7 +173,8 @@ await helper.goto(optionsUrl);
 const entries = (state) => helper.evaluate(async ({ state, modules }) => {
   const { menuEntries, NO_STATE } = /** @type {typeof Actions} */ (await import(modules.actions));
   const { DEFAULTS } = /** @type {typeof SettingsModule} */ (await import(modules.settings));
-  return menuEntries(DEFAULTS, { ...NO_STATE, ...state });
+  const { wordsOf } = /** @type {typeof TextModule} */ (await import(modules.text));
+  return menuEntries(wordsOf(chrome.i18n), DEFAULTS, { ...NO_STATE, ...state });
 }, { state, modules: MODULES });
 // The menu shots' window: five ungrouped tabs, none pinned, so the group items are enabled.
 const defaultEntries = await entries({ ungroupedTabs: 5 });

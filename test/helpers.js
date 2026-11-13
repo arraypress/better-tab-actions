@@ -1,8 +1,31 @@
 /**
- * What more than one test file needs besides the fakes.
+ * What more than one test file needs besides the fakes: the extension's real words, and a way to
+ * hear what's logged.
  *
  * @module test/helpers
  */
+import { fileURLToPath } from 'node:url';
+import { messageLookup } from '@arraypress/extension-kit/testing';
+import { wordsOf } from '../extension/shared/text.js';
+
+/** @import { Words } from '../extension/shared/text.js' */
+
+/** The extension's folder. */
+export const EXTENSION = fileURLToPath(new URL('../extension/', import.meta.url));
+
+/**
+ * `chrome.i18n` over the extension's real `_locales` (en), in a British English Chrome.
+ *
+ * @type {{getMessage(key: string, substitutions?: string | string[]): string, getUILanguage(): string}}
+ */
+export const I18N = { getMessage: messageLookup(EXTENSION), getUILanguage: () => 'en-GB' };
+
+/**
+ * The extension's words, as its pages and worker get them from `chrome.i18n`.
+ *
+ * @type {Words}
+ */
+export const WORDS = wordsOf(I18N);
 
 /**
  * Capture what's logged with `console.error` while `body` runs, and keep it off the test output.

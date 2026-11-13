@@ -1,31 +1,31 @@
 /**
- * Small pieces of wording more than one part of the extension uses: counted nouns ("3 tabs") and
- * short dates ("9 Nov"), in the user's locale.
+ * Wording more than one part of the extension uses: the words themselves (the `_locales`
+ * messages, looked up with the kit's `translator`, and the UI language its `counted` writes
+ * numbers in), short dates ("9 Nov") and durations ("3 days").
  *
  * @module shared/text
  */
+import { counted, translator } from '../vendor/extension-kit/index.js';
 
 /**
- * A noun in the number a count takes: plural when the count isn't 1.
+ * The extension's words: its message lookup and Chrome's UI language.
  *
- * @param {number} n - How many.
- * @param {string} word - The singular noun; the plural adds "s".
- * @returns {string} "day" for 1, else "days".
- * @example
- * noun(1, 'day'); // 'day'
+ * @typedef {object} Words
+ * @property {(key: string, substitutions?: string | string[]) => string} t A message by its key in
+ *   `_locales` (the kit's `translator`: a missing key shows as itself).
+ * @property {string} lang Chrome's UI language ("en-GB"), for numbers and dates.
  */
-export const noun = (n, word) => (n === 1 ? word : `${word}s`);
 
 /**
- * A count and its noun, plural when it isn't 1.
+ * The words, from `chrome.i18n`.
  *
- * @param {number} n - How many.
- * @param {string} word - The singular noun; the plural adds "s".
- * @returns {string} "1 day", "2 days".
+ * @param {{getMessage(key: string, substitutions?: string | string[]): string, getUILanguage(): string}} i18n - `chrome.i18n`.
+ * @returns {Words} The message lookup and the UI language.
  * @example
- * plural(3, 'window'); // '3 windows'
+ * const words = wordsOf(chrome.i18n);
+ * words.t('menuUnmuteTabs'); // 'Unmute tabs'
  */
-export const plural = (n, word) => `${n} ${noun(n, word)}`;
+export const wordsOf = (i18n) => ({ t: translator(i18n), lang: i18n.getUILanguage() });
 
 /**
  * A short date, as Chrome writes one in lists: day and month, plus the year when it isn't the
@@ -47,12 +47,13 @@ export function shortDate(time, locale, now = time) {
  * A number of hours in the largest whole unit, as Chrome's own settings lists say it.
  *
  * @param {number} hours - How many hours.
+ * @param {Words} words - The extension's words.
  * @returns {string} "1 hour", "12 hours", "3 days", "1 week".
  * @example
- * duration(72); // '3 days'
+ * duration(72, words); // '3 days'
  */
-export function duration(hours) {
-  if (hours % (24 * 7) === 0) return plural(hours / (24 * 7), 'week');
-  if (hours % 24 === 0) return plural(hours / 24, 'day');
-  return plural(hours, 'hour');
+export function duration(hours, words) {
+  if (hours % (24 * 7) === 0) return counted(hours / (24 * 7), 'durationWeeksOne', 'durationWeeks', words);
+  if (hours % 24 === 0) return counted(hours / 24, 'durationDaysOne', 'durationDays', words);
+  return counted(hours, 'durationHoursOne', 'durationHours', words);
 }

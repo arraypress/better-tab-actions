@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { until } from '@arraypress/extension-kit/testing';
-import { ACTIONS, menuEntries, SWITCH_LAST } from '../extension/shared/actions.js';
+import { ACTIONS, MENU_MESSAGE, menuEntries, SWITCH_LAST } from '../extension/shared/actions.js';
 import { AUTO_CLOSE_ALARM, AWAKE_KEY, CHECK_MINUTES, HOUR_MS } from '../extension/background/auto-close.js';
 import { menuItems, PARENT_ID, REFRESH_MS } from '../extension/background/menu.js';
 import { startWorker, WORKSPACES_PAGE } from '../extension/background/worker.js';
@@ -19,7 +19,7 @@ import { closedCount } from '../extension/shared/undo.js';
 import { loadWorkspaces } from '../extension/shared/workspaces.js';
 import { EXTENSION_ID } from './fake-browser.js';
 import { dropListeners, fakeChrome } from './fake-chrome.js';
-import { errorsLogged } from './helpers.js';
+import { errorsLogged, WORDS } from './helpers.js';
 
 /**
  * A tab as Chrome hands one to a menu click or a shortcut.
@@ -49,9 +49,9 @@ async function installed() {
 }
 
 test('menuItems: the submenu first, each parent before its children, separators with ids of their own; nothing when every action is hidden', () => {
-  const items = menuItems(menuEntries(undefined, {
+  const items = menuItems(menuEntries(WORDS, undefined, {
     closedCount: 2, mutedByUs: false, ungroupedTabs: 1, pinnedTabs: 0, incognito: false, workspaces: [{ id: 'w1', name: 'Work' }],
-  }));
+  }), WORDS.t(MENU_MESSAGE));
   assert.deepEqual(items[0], { id: PARENT_ID, title: 'More tab actions', contexts: ['tab'] });
   assert.ok(items.every((item) => item.contexts?.join() === 'tab'), 'every item is for the tab strip’s menu');
   assert.equal(new Set(items.map((item) => item.id)).size, items.length, 'no id twice');
@@ -65,7 +65,7 @@ test('menuItems: the submenu first, each parent before its children, separators 
   assert.deepEqual(items.find((item) => item.id === 'reopen-closed-tabs'), {
     id: 'reopen-closed-tabs', parentId: PARENT_ID, title: 'Reopen 2 closed tabs', enabled: true, contexts: ['tab'],
   });
-  assert.deepEqual(menuItems([]), []);
+  assert.deepEqual(menuItems([], 'More tab actions'), []);
 });
 
 test('install and browser start in one run (a Chrome update): one whole menu, nothing refused', async () => {

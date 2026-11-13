@@ -30,5 +30,7 @@ First version.
 - Choose which actions show in the menu.
 - Incognito tabs an action closes aren’t kept for “Reopen closed tabs”, as Chrome keeps no closed
   tabs for incognito windows.
+- Every word is in `_locales` (English: `en`, and `en_GB` for what differs), ready to be translated;
+  counts are written as the language writes numbers.
 - Settings sync through Chrome Sync; settings page styled like chrome://settings, with an About card.
 - Toolbar icon drawn in Chrome’s own icon colours, light and dark.

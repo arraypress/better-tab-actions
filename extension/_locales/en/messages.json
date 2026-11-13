@@ -1,0 +1,382 @@
+{
+  "extName": {
+    "message": "Better Tab Actions"
+  },
+  "extShortName": {
+    "message": "Better Tab Actions"
+  },
+  "extDescription": {
+    "message": "More actions for Chrome’s tab right-click menu: close tabs by site, duplicates, inactive tabs, mute tabs, save windows as groups."
+  },
+  "toolbarTitle": {
+    "message": "Better Tab Actions settings"
+  },
+  "actionCloseSiteTabs": {
+    "message": "Close tabs from this site"
+  },
+  "actionCloseOtherSiteTabs": {
+    "message": "Close other tabs from this site"
+  },
+  "actionCloseDuplicateTabs": {
+    "message": "Close duplicate tabs"
+  },
+  "actionCloseInactiveTabs": {
+    "message": "Close inactive tabs"
+  },
+  "actionCloseTabsToLeft": {
+    "message": "Close tabs to the left"
+  },
+  "actionReopenClosedTabs": {
+    "message": "Reopen closed tabs"
+  },
+  "actionSortTabsBySite": {
+    "message": "Sort tabs by site"
+  },
+  "actionMuteOtherTabs": {
+    "message": "Mute or unmute other tabs"
+  },
+  "actionSaveWindowAsGroup": {
+    "message": "Save this window as a group"
+  },
+  "actionCloseWindowKeepGroup": {
+    "message": "Close window and keep as group"
+  },
+  "actionSaveWorkspace": {
+    "message": "Save windows as workspace"
+  },
+  "actionSaveWindowWorkspace": {
+    "message": "Save this window as workspace"
+  },
+  "actionOpenWorkspace": {
+    "message": "Open last workspace"
+  },
+  "actionSwitchLastTab": {
+    "message": "Switch to last used tab"
+  },
+  "menuMoreTabActions": {
+    "message": "More tab actions"
+  },
+  "menuCloseInactiveOne": {
+    "message": "Close tabs not used in 1 day"
+  },
+  "menuCloseInactive": {
+    "message": "Close tabs not used in $COUNT$ days",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "menuReopenOne": {
+    "message": "Reopen 1 closed tab"
+  },
+  "menuReopen": {
+    "message": "Reopen $COUNT$ closed tabs",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "menuMuteOtherTabs": {
+    "message": "Mute other tabs"
+  },
+  "menuUnmuteTabs": {
+    "message": "Unmute tabs"
+  },
+  "menuOpenWorkspace": {
+    "message": "Open workspace"
+  },
+  "menuManageWorkspaces": {
+    "message": "Manage workspaces"
+  },
+  "durationHoursOne": {
+    "message": "1 hour"
+  },
+  "durationHours": {
+    "message": "$COUNT$ hours",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "durationDaysOne": {
+    "message": "1 day"
+  },
+  "durationDays": {
+    "message": "$COUNT$ days",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "durationWeeksOne": {
+    "message": "1 week"
+  },
+  "durationWeeks": {
+    "message": "$COUNT$ weeks",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "summaryWindowsOne": {
+    "message": "1 window"
+  },
+  "summaryWindows": {
+    "message": "$COUNT$ windows",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "summaryTabsOne": {
+    "message": "1 tab"
+  },
+  "summaryTabs": {
+    "message": "$COUNT$ tabs",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "summarySaved": {
+    "message": "Saved $DATE$",
+    "placeholders": {
+      "date": {
+        "content": "$1"
+      }
+    }
+  },
+  "summaryNotSavedOne": {
+    "message": "1 tab not saved"
+  },
+  "summaryNotSaved": {
+    "message": "$COUNT$ tabs not saved",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsTitle": {
+    "message": "$NAME$ settings",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsSaved": {
+    "message": "Saved"
+  },
+  "optionsMenuHeading": {
+    "message": "Menu"
+  },
+  "optionsMenuIntro": {
+    "message": "Choose what appears under $MENU$ when you right-click a tab. Hidden actions still work from keyboard shortcuts.",
+    "placeholders": {
+      "menu": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsWorkspacesHeading": {
+    "message": "Workspaces"
+  },
+  "optionsNoWorkspaces": {
+    "message": "Workspaces you save appear here. To save your windows, right-click a tab and choose $MENU$ › $ITEM$.",
+    "placeholders": {
+      "menu": {
+        "content": "$1"
+      },
+      "item": {
+        "content": "$2"
+      }
+    }
+  },
+  "optionsWorkspacesFull": {
+    "message": "You can keep up to $COUNT$ workspaces. Delete one to save another.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsReopenGroups": {
+    "message": "Reopen tab groups"
+  },
+  "optionsReopenGroupsSub": {
+    "message": "Chrome also adds each group it reopens to your saved tab groups"
+  },
+  "optionsClosingHeading": {
+    "message": "Closing tabs"
+  },
+  "optionsWindows": {
+    "message": "Windows"
+  },
+  "optionsWindowsSub": {
+    "message": "Where site, duplicate and inactive tabs are closed"
+  },
+  "optionsWindowsThis": {
+    "message": "This window only"
+  },
+  "optionsWindowsAll": {
+    "message": "All windows"
+  },
+  "optionsInactiveAfter": {
+    "message": "Inactive after"
+  },
+  "optionsInactiveAfterSub": {
+    "message": "Used by “Close tabs not used in …”"
+  },
+  "optionsDayUnitOne": {
+    "message": "day"
+  },
+  "optionsDayUnit": {
+    "message": "days"
+  },
+  "optionsIncludeGrouped": {
+    "message": "Include tabs in groups"
+  },
+  "optionsIncludeGroupedSub": {
+    "message": "Turn off to leave grouped tabs alone. Pinned tabs are never closed."
+  },
+  "optionsAutoClose": {
+    "message": "Close unused tabs automatically"
+  },
+  "optionsAutoCloseSub": {
+    "message": "To free memory without closing tabs, use Chrome’s Memory Saver"
+  },
+  "optionsAutoCloseAge": {
+    "message": "Close tabs not used for"
+  },
+  "optionsAutoCloseAgeSub": {
+    "message": "Except pinned tabs, tabs playing sound and each window’s current tab. Bring them back with “Reopen closed tabs”."
+  },
+  "optionsKeepSites": {
+    "message": "Never close tabs from these sites"
+  },
+  "optionsNoSites": {
+    "message": "No sites added"
+  },
+  "optionsAdd": {
+    "message": "Add"
+  },
+  "optionsAddSite": {
+    "message": "Add site"
+  },
+  "optionsEditSite": {
+    "message": "Edit site"
+  },
+  "optionsEdit": {
+    "message": "Edit"
+  },
+  "optionsRemove": {
+    "message": "Remove"
+  },
+  "optionsSave": {
+    "message": "Save"
+  },
+  "optionsCancel": {
+    "message": "Cancel"
+  },
+  "optionsSiteLabel": {
+    "message": "Site"
+  },
+  "optionsSiteInvalid": {
+    "message": "Enter a site, like example.com"
+  },
+  "optionsMoreActions": {
+    "message": "More actions for “$ITEM$”",
+    "placeholders": {
+      "item": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsMemorySaver": {
+    "message": "Memory Saver"
+  },
+  "optionsMemorySaverSub": {
+    "message": "In Chrome’s Performance settings"
+  },
+  "optionsShortcutsHeading": {
+    "message": "Keyboard shortcuts"
+  },
+  "optionsNoShortcuts": {
+    "message": "None set yet. Add them on Chrome’s Keyboard shortcuts page."
+  },
+  "optionsAbout": {
+    "message": "About $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsGetHelp": {
+    "message": "Get help with $NAME$",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsVersion": {
+    "message": "Version $VERSION$",
+    "placeholders": {
+      "version": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsReportIssue": {
+    "message": "Report an issue"
+  },
+  "optionsPrivacyPolicy": {
+    "message": "Privacy policy"
+  },
+  "workspaceOpen": {
+    "message": "Open"
+  },
+  "workspaceRename": {
+    "message": "Rename"
+  },
+  "workspaceReplace": {
+    "message": "Replace with current windows"
+  },
+  "workspaceDelete": {
+    "message": "Delete"
+  },
+  "workspaceRenameTitle": {
+    "message": "Rename workspace"
+  },
+  "workspaceNameLabel": {
+    "message": "Name"
+  },
+  "toastReplaced": {
+    "message": "Replaced “$WORKSPACE$” with your current windows",
+    "placeholders": {
+      "workspace": {
+        "content": "$1"
+      }
+    }
+  },
+  "toastDeleted": {
+    "message": "Deleted “$WORKSPACE$”",
+    "placeholders": {
+      "workspace": {
+        "content": "$1"
+      }
+    }
+  },
+  "toastUndo": {
+    "message": "Undo"
+  }
+}

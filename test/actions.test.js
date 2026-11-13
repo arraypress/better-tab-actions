@@ -8,10 +8,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { ACTIONS, NO_STATE, SWITCH_LAST, menuEntries, menuState, menuTitle } from '../extension/shared/actions.js';
+import { ACTIONS, NO_STATE, SWITCH_LAST, SWITCH_LAST_MESSAGE, menuEntries, menuState, menuTitle } from '../extension/shared/actions.js';
 import { DEFAULTS, normalizeSettings } from '../extension/shared/settings.js';
 import { closedCount } from '../extension/shared/undo.js';
 import { fakeBrowser, runOn, tabsAt, EXTENSION_ID } from './fake-browser.js';
+import { WORDS } from './helpers.js';
 
 /** @import { Action } from '../extension/shared/actions.js' */
 /** @import { Settings } from '../extension/shared/settings.js' */
@@ -327,7 +328,7 @@ test('menuState / menu labels follow mute state and the closed batch', async () 
   ]);
   const labels = async () => {
     const state = menuState(await b.tabs.query({}), await closedCount(b.session), EXTENSION_ID);
-    return Object.fromEntries(menuEntries(DEFAULTS, state).filter((e) => e.id).map((e) => [e.id, e]));
+    return Object.fromEntries(menuEntries(WORDS, DEFAULTS, state).filter((e) => e.id).map((e) => [e.id, e]));
   };
 
   let menu = await labels();
@@ -429,7 +430,7 @@ test('unknown action does nothing', async () => {
 
 test('menuEntries: all actions by default: close actions, sort/mute, the group actions, then workspaces, with separators between', () => {
   assert.deepEqual(
-    menuEntries(DEFAULTS).map((e) => (e.separator ? '---' : e.title)),
+    menuEntries(WORDS).map((e) => (e.separator ? '---' : e.title)),
     [
       'Close tabs from this site',
       'Close other tabs from this site',
@@ -458,7 +459,7 @@ test('menuEntries: hidden actions are left out, and no dangling separator', () =
       'save-workspace', 'save-window-workspace', 'open-workspace',
     ],
   });
-  const entries = menuEntries(settings);
+  const entries = menuEntries(WORDS, settings);
   assert.equal(entries.some((e) => e.separator), false);
   assert.deepEqual(entries.map((e) => e.id), [
     'close-site-tabs',
@@ -467,30 +468,46 @@ test('menuEntries: hidden actions are left out, and no dangling separator', () =
     'close-inactive-tabs',
     'reopen-closed-tabs',
   ]);
-  assert.deepEqual(menuEntries(normalizeSettings({ hiddenActions: ACTIONS.map((a) => a.id) })), []);
+  assert.deepEqual(menuEntries(WORDS, normalizeSettings({ hiddenActions: ACTIONS.map((a) => a.id) })), []);
 });
 
 test('menuTitle: inactive label follows the days setting, with correct plural', () => {
   const inactive = action('close-inactive-tabs');
-  assert.equal(menuTitle(inactive, normalizeSettings({ inactiveDays: 1 })), 'Close tabs not used in 1 day');
-  assert.equal(menuTitle(inactive, normalizeSettings({ inactiveDays: 30 })), 'Close tabs not used in 30 days');
+  assert.equal(menuTitle(inactive, WORDS, normalizeSettings({ inactiveDays: 1 })), 'Close tabs not used in 1 day');
+  assert.equal(menuTitle(inactive, WORDS, normalizeSettings({ inactiveDays: 30 })), 'Close tabs not used in 30 days');
   const reopen = action('reopen-closed-tabs');
-  assert.equal(menuTitle(reopen, DEFAULTS, { ...NO_STATE, closedCount: 1 }), 'Reopen 1 closed tab');
+  assert.equal(menuTitle(reopen, WORDS, DEFAULTS, { ...NO_STATE, closedCount: 1 }), 'Reopen 1 closed tab');
 });
 
 // --- Manifest ---
 
 const manifest = JSON.parse(readFileSync(new URL('../extension/manifest.json', import.meta.url), 'utf8'));
 
-test('manifest: every action has a matching command, plus the shortcut-only "switch to last used tab"', () => {
+test('manifest: every action has a matching command described by the action’s own message, plus the shortcut-only "switch to last used tab"', () => {
   const commands = manifest.commands;
   // "Switch to last used tab" has no menu item: it's only useful from the keyboard.
   assert.deepEqual(Object.keys(commands).sort(), [...ACTIONS.map((a) => a.id), SWITCH_LAST].sort());
-  for (const action of ACTIONS) assert.equal(commands[action.id].description, action.title);
-  assert.equal(commands[SWITCH_LAST].description, 'Switch to last used tab');
+  for (const action of ACTIONS) assert.equal(commands[action.id].description, `__MSG_${action.message}__`);
+  assert.equal(commands[SWITCH_LAST].description, `__MSG_${SWITCH_LAST_MESSAGE}__`);
+  assert.deepEqual(
+    [SWITCH_LAST_MESSAGE, ...ACTIONS.map((a) => a.message)].map((key) => WORDS.t(key)),
+    [
+      'Switch to last used tab', 'Close tabs from this site', 'Close other tabs from this site', 'Close duplicate tabs',
+      'Close inactive tabs', 'Close tabs to the left', 'Reopen closed tabs', 'Sort tabs by site', 'Mute or unmute other tabs',
+      'Save this window as a group', 'Close window and keep as group', 'Save windows as workspace',
+      'Save this window as workspace', 'Open last workspace',
+    ],
+    'as Chrome’s Keyboard shortcuts page lists them',
+  );
 });
 
-test('manifest: within Chrome Web Store limits', () => {
-  assert.ok(manifest.name.length <= 75);
-  assert.ok(manifest.description.length <= 132, `description is ${manifest.description.length} chars`);
+test('manifest: its name, description and toolbar title are messages, within Chrome Web Store limits', () => {
+  assert.deepEqual(
+    [manifest.name, manifest.short_name, manifest.description, manifest.action.default_title, manifest.default_locale],
+    ['__MSG_extName__', '__MSG_extShortName__', '__MSG_extDescription__', '__MSG_toolbarTitle__', 'en'],
+  );
+  assert.equal(WORDS.t('extName'), 'Better Tab Actions');
+  assert.equal(WORDS.t('toolbarTitle'), 'Better Tab Actions settings');
+  assert.ok(WORDS.t('extName').length <= 75);
+  assert.ok(WORDS.t('extDescription').length <= 132, `description is ${WORDS.t('extDescription').length} chars`);
 });

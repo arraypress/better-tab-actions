@@ -15,10 +15,12 @@
  * @module shared/workspaces
  */
 import { mainSite, MAX_URL, tabUrl } from './sites.js';
-import { plural, shortDate } from './text.js';
+import { counted } from '../vendor/extension-kit/index.js';
+import { shortDate } from './text.js';
 
 /** @import { StorageArea } from '../vendor/extension-kit/settings/storage.js' */
 /** @import { Tab } from './sites.js' */
+/** @import { Words } from './text.js' */
 
 /**
  * One saved tab.
@@ -285,13 +287,17 @@ export function workspaceName(windows, now, locale) {
  *
  * @param {Workspace} workspace - The workspace.
  * @param {number} now - Today, so the year shows only for another year.
- * @param {string} [locale] - For the date; the browser's own when left out.
+ * @param {Words} words - The extension's words, and the language for the date.
  * @returns {string} "2 windows · 24 tabs · Saved 9 Nov", plus " · 3 tabs not saved".
  */
-export function workspaceSummary({ windows, skipped, savedAt }, now, locale) {
+export function workspaceSummary({ windows, skipped, savedAt }, now, words) {
   const tabs = windows.reduce((sum, win) => sum + win.tabs.length, 0);
-  const parts = [plural(windows.length, 'window'), plural(tabs, 'tab'), `Saved ${shortDate(savedAt, locale, now)}`];
-  if (skipped) parts.push(`${plural(skipped, 'tab')} not saved`);
+  const parts = [
+    counted(windows.length, 'summaryWindowsOne', 'summaryWindows', words),
+    counted(tabs, 'summaryTabsOne', 'summaryTabs', words),
+    words.t('summarySaved', [shortDate(savedAt, words.lang, now)]),
+  ];
+  if (skipped) parts.push(counted(skipped, 'summaryNotSavedOne', 'summaryNotSaved', words));
   return parts.join(' · ');
 }
 

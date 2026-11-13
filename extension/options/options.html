@@ -1,9 +1,10 @@
 <!doctype html>
 <html lang="en">
+<!-- Every word comes from _locales: data-i18n here (the kit's setUpPage fills it), the rest from options.js. -->
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Better Tab Actions settings</title>
+  <title></title>
   <link rel="icon" href="../icons/icon-32.png">
   <link rel="stylesheet" href="../vendor/extension-kit/styles/chrome-ui.css">
   <link rel="stylesheet" href="options.css">
@@ -12,7 +13,7 @@
   <header class="toolbar">
     <div class="toolbar-start">
       <img src="../icons/icon-48.png" alt="" width="24" height="24">
-      <h1>Better Tab Actions</h1>
+      <h1 data-i18n="extShortName"></h1>
     </div>
     <div class="toolbar-center"></div>
     <div class="toolbar-end">
@@ -21,111 +22,111 @@
   </header>
 
   <main class="page">
-    <h2 class="section-title" id="h-menu">Menu</h2>
+    <h2 class="section-title" id="h-menu" data-i18n="optionsMenuHeading"></h2>
     <section class="card" aria-labelledby="h-menu">
-      <p class="row text"><span class="label">Choose what appears under <strong>More tab actions</strong> when you right-click a tab. Hidden actions still work from keyboard shortcuts.</span></p>
+      <p class="row text"><span class="label" id="menu-intro"></span></p>
       <div id="menu-items" class="menu-items"></div>
     </section>
 
-    <h2 class="section-title" id="workspaces">Workspaces</h2>
+    <h2 class="section-title" id="workspaces" data-i18n="optionsWorkspacesHeading"></h2>
     <section class="card" aria-labelledby="workspaces">
-      <p id="no-workspaces" class="row text" hidden><span class="label">Workspaces you save appear here. To save your windows, right-click a tab and choose <strong>More tab actions</strong> › <strong>Save windows as workspace</strong>.</span></p>
+      <p id="no-workspaces" class="row text" hidden><span class="label" id="no-workspaces-text"></span></p>
       <ul id="workspace-list" class="list" aria-labelledby="workspaces"></ul>
-      <p id="workspaces-full" class="row text" hidden><span class="label">You can keep up to 40 workspaces. Delete one to save another.</span></p>
+      <p id="workspaces-full" class="row text" hidden><span class="label" id="workspaces-full-text"></span></p>
       <label class="row two-line">
         <span class="label">
-          <span>Reopen tab groups</span>
-          <span class="secondary">Chrome also adds each group it reopens to your saved tab groups</span>
+          <span data-i18n="optionsReopenGroups"></span>
+          <span class="secondary" data-i18n="optionsReopenGroupsSub"></span>
         </span>
         <input id="reopenGroups" type="checkbox" class="switch" role="switch">
       </label>
     </section>
 
-    <h2 class="section-title" id="h-closing">Closing tabs</h2>
+    <h2 class="section-title" id="h-closing" data-i18n="optionsClosingHeading"></h2>
     <section class="card" aria-labelledby="h-closing">
       <div class="row two-line">
         <label class="label" for="windowScope">
-          <span>Windows</span>
-          <span class="secondary">Where site, duplicate and inactive tabs are closed</span>
+          <span data-i18n="optionsWindows"></span>
+          <span class="secondary" data-i18n="optionsWindowsSub"></span>
         </label>
         <select id="windowScope">
-          <option value="window">This window only</option>
-          <option value="all">All windows</option>
+          <option value="window" data-i18n="optionsWindowsThis"></option>
+          <option value="all" data-i18n="optionsWindowsAll"></option>
         </select>
       </div>
       <div class="row two-line">
         <label class="label" for="inactiveDays">
-          <span>Inactive after</span>
-          <span class="secondary">Used by “Close tabs not used in …”</span>
+          <span data-i18n="optionsInactiveAfter"></span>
+          <span class="secondary" data-i18n="optionsInactiveAfterSub"></span>
         </label>
-        <span class="days"><input id="inactiveDays" type="number" min="1" max="365" step="1" inputmode="numeric"> <span id="days-unit">days</span></span>
+        <span class="days"><input id="inactiveDays" type="number" min="1" max="365" step="1" inputmode="numeric"> <span id="days-unit"></span></span>
       </div>
       <label class="row two-line">
         <span class="label">
-          <span>Include tabs in groups</span>
-          <span class="secondary">Turn off to leave grouped tabs alone. Pinned tabs are never closed.</span>
+          <span data-i18n="optionsIncludeGrouped"></span>
+          <span class="secondary" data-i18n="optionsIncludeGroupedSub"></span>
         </span>
         <input id="includeGroupedTabs" type="checkbox" class="switch" role="switch">
       </label>
       <label class="row two-line">
         <span class="label">
-          <span>Close unused tabs automatically</span>
-          <span class="secondary">To free memory without closing tabs, use Chrome’s Memory Saver</span>
+          <span data-i18n="optionsAutoClose"></span>
+          <span class="secondary" data-i18n="optionsAutoCloseSub"></span>
         </span>
         <input id="autoClose" type="checkbox" class="switch" role="switch">
       </label>
       <div id="auto-close-options" hidden>
         <div class="row two-line">
           <label class="label" for="autoCloseHours">
-            <span>Close tabs not used for</span>
-            <span class="secondary">Except pinned tabs, tabs playing sound and each window’s current tab. Bring them back with “Reopen closed tabs”.</span>
+            <span data-i18n="optionsAutoCloseAge"></span>
+            <span class="secondary" data-i18n="optionsAutoCloseAgeSub"></span>
           </label>
           <select id="autoCloseHours"></select>
         </div>
         <div class="row">
-          <span class="label" id="keep-sites-label">Never close tabs from these sites</span>
-          <button id="add-site" type="button">Add</button>
+          <span class="label" id="keep-sites-label" data-i18n="optionsKeepSites"></span>
+          <button id="add-site" type="button" data-i18n="optionsAdd"></button>
         </div>
-        <p id="no-sites" class="row text"><span class="label">No sites added</span></p>
+        <p id="no-sites" class="row text"><span class="label" data-i18n="optionsNoSites"></span></p>
         <ul id="site-list" class="list" aria-labelledby="keep-sites-label"></ul>
       </div>
       <button id="memory-saver" type="button" class="link-row external">
         <span class="label">
-          <span>Memory Saver</span>
-          <span class="secondary">In Chrome’s Performance settings</span>
+          <span data-i18n="optionsMemorySaver"></span>
+          <span class="secondary" data-i18n="optionsMemorySaverSub"></span>
         </span>
       </button>
     </section>
 
-    <h2 class="section-title" id="h-shortcuts">Keyboard shortcuts</h2>
+    <h2 class="section-title" id="h-shortcuts" data-i18n="optionsShortcutsHeading"></h2>
     <section class="card" aria-labelledby="h-shortcuts">
       <div id="shortcuts"></div>
       <button id="edit-shortcuts" type="button" class="link-row external">
         <span class="label">
-          <span>Keyboard shortcuts</span>
-          <span id="no-shortcuts" class="secondary" hidden>None set yet. Add them on Chrome’s Keyboard shortcuts page.</span>
+          <span data-i18n="optionsShortcutsHeading"></span>
+          <span id="no-shortcuts" class="secondary" data-i18n="optionsNoShortcuts" hidden></span>
         </span>
       </button>
     </section>
 
     <!-- Copies chrome://settings/help ("About Chrome"); links come from about-links.js (githubAboutLinks). -->
-    <h2 class="section-title" id="h-about">About Better Tab Actions</h2>
+    <h2 class="section-title" id="h-about" data-i18n="optionsAbout"></h2>
     <section class="card" aria-labelledby="h-about">
       <div class="row two-line about-product">
         <img src="../icons/icon-128.png" width="32" height="32" alt="">
-        <span class="label product-title">Better Tab Actions</span>
+        <span class="label product-title" data-i18n="extShortName"></span>
       </div>
       <div class="row">
         <span class="label"><span id="version" class="secondary"></span></span>
       </div>
       <a id="help" class="link-row external" target="_blank" rel="noopener">
-        <span class="label">Get help with Better Tab Actions</span>
+        <span class="label" data-i18n="optionsGetHelp"></span>
       </a>
       <a id="report-issue" class="link-row external">
-        <span class="label">Report an issue</span>
+        <span class="label" data-i18n="optionsReportIssue"></span>
       </a>
       <a id="privacy-policy" class="link-row external" target="_blank" rel="noopener">
-        <span class="label">Privacy policy</span>
+        <span class="label" data-i18n="optionsPrivacyPolicy"></span>
       </a>
     </section>
   </main>

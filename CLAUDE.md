@@ -8,6 +8,7 @@ around it holds the tests, scripts, store assets and docs. Same family setup as 
 - **Actions**: `shared/actions.js` (`ACTIONS`: what each does as a plan worked out from the tabs,
   `menuEntries`/`menuState` for the submenu, `runAction`), `shared/undo.js` (the closed batch
   behind "Reopen closed tabs"), `shared/workspaces.js`, `shared/sites.js`, `shared/text.js`.
+- **Words**: every word people see is a message in `_locales/en/messages.json` (see Wording).
 - **Service worker**: `background/background.js` is only the entry (it calls `startWorker(chrome)`
   and the kit's `startToolbarTheme(chrome)` at top level). `background/worker.js` registers every
   listener on the `chrome` it's given, so `test/worker.test.js` runs the real wiring against an
@@ -28,24 +29,24 @@ around it holds the tests, scripts, store assets and docs. Same family setup as 
   loudly if one is ever a placeholder).
 - **Toolbar glyph**: `action.default_icon` is a light/dark glyph (`icons/toolbar/`, `npm run
   toolbar-icons`). The kit does the work: `startToolbarTheme(chrome)` in the worker,
-  `watchColorScheme(chrome)` on the options page, `watchSchemeOffscreen` in `offscreen/` (kept open
+  `setUpPage(chrome, …)` on the options page (it starts `watchColorScheme`), `watchSchemeOffscreen` in `offscreen/` (kept open
   with reason MATCH_MEDIA, polling as offscreen pages get no `change` events), key `toolbarDark`
   in local, never synced; `test/e2e/toolbar.mjs` runs the kit's `checkToolbarTheme`.
 
 ## Libraries
 `@arraypress/extension-kit` (^1.11.1, from npm): chrome-ui.css, the settings store and saver,
-`contextMenuBuilder`, the toolbar glyph, About links, `setShortcuts`, the ⋮ menu
+`contextMenuBuilder`, the toolbar glyph, About links, `setShortcuts`, i18n (`setUpPage`,
+`translator`, `counted`, `data-i18n`), the ⋮ menu
 (`createMenu`/`moreActionsButton`), the one-field dialog (`askText`), the toast with Undo
 (`createToast`), the site list (`createSiteList`, `siteHost`, `onSite`), `make`, `focusedIn`,
 `syncItemBytes`, packaging, test builds, and the test helpers (`fakeChromeStorage`, `runChecks`,
-`stopWorker`, `missingReferences`, `savedTabGroups`, `warningsAddedBy`, `checkToolbarTheme`).
+`stopWorker`, `missingReferences`, `messageLookup`/`readMessages`, `savedTabGroups`,
+`warningsAddedBy`, `checkToolbarTheme`).
 `extension/vendor/extension-kit/` is its browser half, copied from `node_modules` by `npm install`
 (`postinstall`) and never committed (gitignored), so it can't drift from `package.json`. Never
 edit it. `npm install <pkg>` doesn't rerun `postinstall`: run `npm run postinstall` after one.
 
 Kept here because the kit has no equivalent (candidates for it):
-- `shared/text.js` `plural`/`noun`/`duration`: the kit's `counted` takes `_locales` message keys,
-  and this extension has no `_locales` (its words are in the code and the page, English only).
 - `background/menu.js`'s own turn-taking around `contextMenuBuilder`: the builder takes the
   items, and this menu's items must be read when the build's turn comes, not when it was asked for.
 - `options/workspaces-section.js` keeping the focus in a list across a redraw (the kit does it
@@ -63,7 +64,11 @@ Kept here because the kit has no equivalent (candidates for it):
   access and the kit's fake storage, holding real state and refusing what Chromium refuses:
   addresses extensions can't open, a window placed mostly off the screen) and
   `test/fake-chrome.js` around it (the menu Chrome holds, alarms, and the events Chrome fires),
-  which the real `startWorker` runs against.
+  which the real `startWorker` runs against. The words are the real `_locales`, through the kit's
+  `messageLookup` (`test/helpers.js` `WORDS`).
+- `test/locales.test.js`: every message used exists and every message is used, placeholders line
+  up, each count has both its messages, en_GB only overrides en, Chrome's wording (curly quotes,
+  no exclamation marks), and the name written only in `extName`, `extShortName` and `toolbarTitle`.
 - `npm run e2e` (Playwright's Chromium, not part of `npm test`): `scripts/build-e2e.mjs` makes
   `.test-builds/e2e/` (the kit's `buildTestCopy`): `extension/` with `test/e2e/hook.js` as its
   service worker, which exposes `handleMenuClick` and `handleCommand` (what a menu click and a
@@ -195,6 +200,22 @@ only linked, never reimplemented.
 ## Wording
 Tabby's rules (`../tabby/CLAUDE.md`, "Wording"): Chrome's own words, sentence case, curly
 quotes and apostrophes, "…" only when something asks for more input.
+- **Every word is in `_locales`** (`en`, the default, and `en_GB`, which holds only what differs:
+  so far the description, the same text, so the folder exists for Chrome and the store). The
+  manifest's name, description, toolbar title and command descriptions are `__MSG_…__`; the page's
+  text is `data-i18n` (filled by the kit's `setUpPage`); scripts look words up through
+  `shared/text.js` `Words` (`{t, lang}`: the kit's `translator` and Chrome's UI language, from
+  `wordsOf(chrome.i18n)` in the worker, `setUpPage`'s `t` on the page). `menuEntries`, `menuTitle`,
+  `duration` and `workspaceSummary` take the words as an argument, so tests pass the real messages.
+- An action's `message` is its name's key, and the same message is its command's description in
+  the manifest (`test/actions.test.js` holds them together). Counts are the kit's `counted` with a
+  pair of messages, `xOne` (“1 day”) and `x` (“$COUNT$ days”): the menu's days and closed tabs,
+  the ages, a workspace's windows and tabs.
+- Messages that name the extension take it as `$NAME$` (content `$1`), filled from `extShortName`
+  by the kit; the manifest's own messages can't, so `toolbarTitle` writes it out.
+- Two messages name menu items, shown in bold (`options.js` `showWithNames`): the names are
+  placeholders, filled from the menu's own messages, so they can't drift from the menu.
+- Group and workspace names (a site, or a date) and dates come from `Intl` in Chrome's language.
 - The extension was called More Tab Actions until 10 Nov 2026 (renamed for the Better family). The tab menu's
   submenu stays “More tab actions”, as Chrome words its own “More …” entries; `PARENT_ID` stays `more-tab-actions`.
 

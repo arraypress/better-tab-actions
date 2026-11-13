@@ -1,8 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "Better Tab Actions",
+  "name": "__MSG_extName__",
+  "short_name": "__MSG_extShortName__",
   "version": "1.0.0",
-  "description": "More actions for Chrome’s tab right-click menu: close tabs by site, duplicates, inactive tabs, mute tabs, save windows as groups.",
+  "description": "__MSG_extDescription__",
+  "default_locale": "en",
   "minimum_chrome_version": "150",
   "icons": {
     "16": "icons/icon-16.png",
@@ -11,7 +13,7 @@
     "128": "icons/icon-128.png"
   },
   "action": {
-    "default_title": "Better Tab Actions settings",
+    "default_title": "__MSG_toolbarTitle__",
     "default_icon": {
       "16": "icons/toolbar/light-16.png",
       "32": "icons/toolbar/light-32.png",
@@ -24,20 +26,20 @@
   },
   "permissions": ["contextMenus", "tabs", "tabGroups", "storage", "offscreen", "alarms"],
   "commands": {
-    "switch-last-tab": { "description": "Switch to last used tab" },
-    "close-site-tabs": { "description": "Close tabs from this site" },
-    "close-other-site-tabs": { "description": "Close other tabs from this site" },
-    "close-duplicate-tabs": { "description": "Close duplicate tabs" },
-    "close-inactive-tabs": { "description": "Close inactive tabs" },
-    "close-tabs-to-left": { "description": "Close tabs to the left" },
-    "reopen-closed-tabs": { "description": "Reopen closed tabs" },
-    "sort-tabs-by-site": { "description": "Sort tabs by site" },
-    "mute-other-tabs": { "description": "Mute or unmute other tabs" },
-    "save-window-as-group": { "description": "Save this window as a group" },
-    "close-window-keep-group": { "description": "Close window and keep as group" },
-    "save-workspace": { "description": "Save windows as workspace" },
-    "save-window-workspace": { "description": "Save this window as workspace" },
-    "open-workspace": { "description": "Open last workspace" }
+    "switch-last-tab": { "description": "__MSG_actionSwitchLastTab__" },
+    "close-site-tabs": { "description": "__MSG_actionCloseSiteTabs__" },
+    "close-other-site-tabs": { "description": "__MSG_actionCloseOtherSiteTabs__" },
+    "close-duplicate-tabs": { "description": "__MSG_actionCloseDuplicateTabs__" },
+    "close-inactive-tabs": { "description": "__MSG_actionCloseInactiveTabs__" },
+    "close-tabs-to-left": { "description": "__MSG_actionCloseTabsToLeft__" },
+    "reopen-closed-tabs": { "description": "__MSG_actionReopenClosedTabs__" },
+    "sort-tabs-by-site": { "description": "__MSG_actionSortTabsBySite__" },
+    "mute-other-tabs": { "description": "__MSG_actionMuteOtherTabs__" },
+    "save-window-as-group": { "description": "__MSG_actionSaveWindowAsGroup__" },
+    "close-window-keep-group": { "description": "__MSG_actionCloseWindowKeepGroup__" },
+    "save-workspace": { "description": "__MSG_actionSaveWorkspace__" },
+    "save-window-workspace": { "description": "__MSG_actionSaveWindowWorkspace__" },
+    "open-workspace": { "description": "__MSG_actionOpenWorkspace__" }
   },
   "background": {
     "service_worker": "background/background.js",

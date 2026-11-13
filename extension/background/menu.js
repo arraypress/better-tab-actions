@@ -15,8 +15,6 @@ import { contextMenuBuilder } from '../vendor/extension-kit/index.js';
 
 /** The submenu's own item. Its id predates the extension's rename, and stays. */
 export const PARENT_ID = 'more-tab-actions';
-/** The submenu's title, as Chrome words its own “More …” entries. */
-export const PARENT_TITLE = 'More tab actions';
 /** How long a burst of tab events is given to end before the labels are looked at again, in ms. */
 export const REFRESH_MS = 100;
 
@@ -38,14 +36,15 @@ export const REFRESH_MS = 100;
  * `chrome.contextMenus.create` properties for the whole menu, each parent before its children.
  *
  * @param {readonly MenuEntry[]} entries - The submenu's entries, from `menuEntries`.
+ * @param {string} title - The submenu's own title (shared/actions.js `MENU_MESSAGE`).
  * @returns {MenuItem[]} The items, the submenu itself first; [] when every action is hidden (no menu at all).
  * @example
- * menuItems(menuEntries(settings, state)); // [{ id: 'more-tab-actions', title: 'More tab actions', … }, …]
+ * menuItems(menuEntries(words, settings, state), words.t(MENU_MESSAGE)); // [{ id: 'more-tab-actions', title: 'More tab actions', … }, …]
  */
-export function menuItems(entries) {
+export function menuItems(entries, title) {
   if (!entries.length) return [];
   /** @type {MenuItem[]} */
-  const items = [{ id: PARENT_ID, title: PARENT_TITLE, contexts: ['tab'] }];
+  const items = [{ id: PARENT_ID, title, contexts: ['tab'] }];
   /**
    * @param {readonly MenuEntry[]} list - Entries.
    * @param {string} parentId - The item they go under.
@@ -74,9 +73,9 @@ const look = (item) => `${item.enabled !== false}|${item.title}`;
  * Keeps Chrome's menu in step with the extension's state.
  *
  * @typedef {object} MenuKeeper
- * @property {() => Promise<void>} build Build the menu whole, from the entries as they are when
+ * @property {() => Promise<void>} build Build the menu whole, from the items as they are when
  *   its turn comes (after any build or refresh under way). Errors are logged, not thrown.
- * @property {() => void} refresh Look at the entries again once a burst of calls has ended, and
+ * @property {() => void} refresh Look at the items again once a burst of calls has ended, and
  *   tell Chrome only about the items whose title or greyed-out state changed.
  */
 
@@ -84,10 +83,10 @@ const look = (item) => `${item.enabled !== false}|${item.title}`;
  * Make the menu's keeper.
  *
  * @param {MenuEdges} edges - `chrome` (or fakes in tests).
- * @param {() => Promise<MenuEntry[]>} read - The submenu's entries as they should be now.
+ * @param {() => Promise<MenuItem[]>} read - The menu's items as they should be now ({@link menuItems}).
  * @returns {MenuKeeper} The keeper.
  * @example
- * const menu = createMenuKeeper(chrome, currentEntries);
+ * const menu = createMenuKeeper(chrome, async () => menuItems(await currentEntries(), words.t(MENU_MESSAGE)));
  * chrome.runtime.onInstalled.addListener(menu.build);
  * chrome.tabs.onRemoved.addListener(menu.refresh);
  */
@@ -111,7 +110,7 @@ export function createMenuKeeper({ contextMenus, runtime }, read) {
 
   return {
     build: () => inTurn(async () => {
-      const items = menuItems(await read());
+      const items = await read();
       await buildMenu(items);
       shown.clear();
       for (const item of items) if (item.type !== 'separator') shown.set(item.id, look(item));
@@ -119,7 +118,7 @@ export function createMenuKeeper({ contextMenus, runtime }, read) {
     refresh() {
       clearTimeout(timer);
       timer = setTimeout(() => inTurn(async () => {
-        for (const item of menuItems(await read())) {
+        for (const item of await read()) {
           if (item.type === 'separator' || shown.get(item.id) === look(item)) continue;
           // An item that isn't in the menu (a build is on its way) is refused: nothing to update.
           await contextMenus.update(item.id, { title: item.title, enabled: item.enabled })

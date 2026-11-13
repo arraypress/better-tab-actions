@@ -10,17 +10,25 @@
  */
 
 import {
-  byId, createSettingsSaver, createSiteList, make, setAboutLinks, setShortcuts, siteHost, statusFlasher, valueRow,
-  watchColorScheme, withoutSite, withSite, withSiteReplaced,
+  byId, createSettingsSaver, createSiteList, make, setAboutLinks, setShortcuts, setUpPage, siteHost, statusFlasher,
+  valueRow, withoutSite, withSite, withSiteReplaced,
 } from '../vendor/extension-kit/index.js';
 import { ABOUT_LINKS } from './about-links.js';
-import { ACTIONS, menuTitle, SWITCH_LAST } from '../shared/actions.js';
+import { ACTIONS, MENU_MESSAGE, menuTitle, SWITCH_LAST, SWITCH_LAST_MESSAGE } from '../shared/actions.js';
 import { AUTO_CLOSE_HOURS, normalizeSettings, settingsStore } from '../shared/settings.js';
-import { duration, noun } from '../shared/text.js';
+import { duration } from '../shared/text.js';
+import { MAX_WORKSPACES } from '../shared/workspaces.js';
 import { startWorkspaces } from './workspaces-section.js';
 
 /** @import { Action } from '../shared/actions.js' */
 /** @import { Settings } from '../shared/settings.js' */
+/** @import { Words } from '../shared/text.js' */
+
+// The page's words (its data-i18n text and title filled in), and its light or dark scheme reported
+// for the toolbar glyph. Messages that name the extension (“$NAME$ settings”) get extShortName.
+const t = setUpPage(chrome, { title: 'optionsTitle' });
+/** @type {Words} */
+const words = { t, lang: chrome.i18n.getUILanguage() };
 
 const windowScope = byId('windowScope', HTMLSelectElement);
 const inactiveDays = byId('inactiveDays', HTMLInputElement);
@@ -28,14 +36,11 @@ const includeGroupedTabs = byId('includeGroupedTabs', HTMLInputElement);
 const reopenGroups = byId('reopenGroups', HTMLInputElement);
 const autoClose = byId('autoClose', HTMLInputElement);
 const autoCloseHours = byId('autoCloseHours', HTMLSelectElement);
-autoCloseHours.append(...AUTO_CLOSE_HOURS.map((hours) => new Option(duration(hours), String(hours))));
-
-// The toolbar glyph follows this page's light or dark scheme.
-watchColorScheme(chrome).catch((error) => console.debug('Reporting the colour scheme:', error));
+autoCloseHours.append(...AUTO_CLOSE_HOURS.map((hours) => new Option(duration(hours, words), String(hours))));
 
 let settings = await settingsStore.load(chrome.storage);
 const flash = statusFlasher(byId('status'), 1500);
-const saver = createSettingsSaver(settingsStore, chrome.storage, { onSaved: () => flash('Saved') });
+const saver = createSettingsSaver(settingsStore, chrome.storage, { onSaved: () => flash(t('optionsSaved')) });
 
 // "Never close tabs from these sites", as chrome://settings/performance lists the sites Memory Saver
 // keeps active: Add asks in a dialog; each site has a ⋮ menu with Edit and Remove.
@@ -47,7 +52,24 @@ const keepSites = createSiteList({
   add: (site) => save({ keepSites: withSite(settings.keepSites, site) }),
   remove: (site) => save({ keepSites: withoutSite(settings.keepSites, site) }),
   replace: (site, edited) => save({ keepSites: withSiteReplaced(settings.keepSites, site, edited) }),
+  t,
 });
+
+/**
+ * Show a message that names things in Chrome's menus, each name in bold.
+ *
+ * @param {HTMLElement} element - Where it goes.
+ * @param {string} key - The message; its placeholders are the names, in order.
+ * @param {readonly string[]} names - The names (“More tab actions”).
+ */
+function showWithNames(element, key, names) {
+  // Each name's place is marked, the message cut there, and the names put back as <strong>.
+  const parts = t(key, names.map((_, i) => `\u0001${i}\u0001`)).split('\u0001');
+  element.replaceChildren(...parts.map((part, i) => (i % 2 ? make('strong', '', names[Number(part)]) : part)));
+}
+showWithNames(byId('menu-intro'), 'optionsMenuIntro', [t(MENU_MESSAGE)]);
+showWithNames(byId('no-workspaces-text'), 'optionsNoWorkspaces', [t(MENU_MESSAGE), t('actionSaveWorkspace')]);
+byId('workspaces-full-text').textContent = t('optionsWorkspacesFull', [String(MAX_WORKSPACES)]);
 
 /**
  * The Menu card's rows, one per action in menu order: a label and its switch. Made once and
@@ -75,7 +97,7 @@ const menuRows = ACTIONS.map((action) => {
 /** Show each action's title (it can depend on the settings: the number of days) and whether it's in the menu. */
 function renderMenuItems() {
   for (const { action, text, toggle } of menuRows) {
-    text.textContent = menuTitle(action, settings);
+    text.textContent = menuTitle(action, words, settings);
     toggle.checked = !settings.hiddenActions.includes(action.id);
   }
 }
@@ -87,7 +109,8 @@ function renderMenuItems() {
  */
 async function renderShortcuts() {
   // "Switch to last used tab" is a shortcut only (no menu item), listed first.
-  const shortcuts = setShortcuts([{ id: SWITCH_LAST, title: 'Switch to last used tab' }, ...ACTIONS], await chrome.commands.getAll());
+  const commands = [{ id: SWITCH_LAST, message: SWITCH_LAST_MESSAGE }, ...ACTIONS].map(({ id, message }) => ({ id, title: t(message) }));
+  const shortcuts = setShortcuts(commands, await chrome.commands.getAll());
   byId('shortcuts').replaceChildren(...shortcuts.map(({ title, shortcut }) => valueRow(title, shortcut)));
   byId('edit-shortcuts').classList.toggle('first', shortcuts.length === 0);
   byId('no-shortcuts').hidden = shortcuts.length > 0;
@@ -110,7 +133,7 @@ function render() {
   windowScope.value = settings.windowScope;
   // What's being typed is left alone: the field shows the stored (clamped) number once it's left.
   if (document.activeElement !== inactiveDays) inactiveDays.value = String(settings.inactiveDays);
-  byId('days-unit').textContent = noun(settings.inactiveDays, 'day');
+  byId('days-unit').textContent = settings.inactiveDays === 1 ? t('optionsDayUnitOne') : t('optionsDayUnit');
   includeGroupedTabs.checked = settings.includeGroupedTabs;
   reopenGroups.checked = settings.reopenGroups;
   autoClose.checked = settings.autoClose;
@@ -152,9 +175,9 @@ saver.follow((changed) => {
 }, chrome.storage.onChanged);
 
 // About card: the version Chrome loaded, and the links from about-links.js.
-byId('version').textContent = `Version ${chrome.runtime.getManifest().version}`;
+byId('version').textContent = t('optionsVersion', [chrome.runtime.getManifest().version]);
 setAboutLinks(ABOUT_LINKS);
 
 render();
 renderShortcuts();
-startWorkspaces(() => settings);
+startWorkspaces(() => settings, words);
