@@ -153,7 +153,7 @@ repo must be public first). The text is `PRIVACY.md`; the draft below is the sam
 >
 > **What it sends:** nothing. It makes no network requests, has no analytics or ads, and needs no account. Settings sync is Chrome’s own, through your Google account. Nobody, including ArrayPress, receives any of your data.
 >
-> Questions: david@arraypress.com.
+> Questions: support@arraypress.com.
 
 ## Version History
 

@@ -38,4 +38,4 @@ is Chrome’s own, through your Google account. Nobody, including ArrayPress, re
 ## Contact
 
 Questions: [open an issue](https://github.com/arraypress/better-tab-actions/issues) or email
-david@arraypress.com.
+support@arraypress.com.
