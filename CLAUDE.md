@@ -36,7 +36,7 @@ around it holds the tests, scripts, store assets and docs. Same family setup as 
   in local, never synced; `test/e2e/toolbar.mjs` runs the kit's `checkToolbarTheme`.
 
 ## Libraries
-`@arraypress/extension-kit` (^1.11.1, from npm): chrome-ui.css, the settings store and saver,
+`@arraypress/extension-kit` (^1.12.0, from npm): chrome-ui.css, the settings store and saver,
 `contextMenuBuilder`, the toolbar glyph, About links, `setShortcuts`, i18n (`setUpPage`,
 `translator`, `counted`, `data-i18n`), the ⋮ menu
 (`createMenu`/`moreActionsButton`), the one-field dialog (`askText`), the toast with Undo
