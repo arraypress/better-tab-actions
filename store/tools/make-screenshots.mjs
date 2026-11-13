@@ -3,8 +3,7 @@
  *
  *   node store/tools/make-screenshots.mjs
  *
- * Loads extension/ as an unpacked extension in Playwright's Chromium (Playwright 1.64.0 from the
- * Tabby repo, launched the way Tabby's e2e tests do) and:
+ * Loads extension/ as an unpacked extension in Playwright's Chromium and:
  * - captures the real options page (light and dark);
  * - opens real tabs and runs the real "Close duplicate tabs" action (actions.js runAction, as
  *   background.js does) to get the before/after tab lists;
@@ -12,8 +11,9 @@
  * - saves real workspaces from windows of made-up sites (workspaces.js snapshotWindows and
  *   workspaceName) for the Workspaces card.
  *
- * Chrome's own tab right-click menu is native and can't be captured headlessly, so it is drawn
- * (frame.mjs): Chrome 157 on macOS, items and order from Chromium's tab_menu_model.cc at tag
+ * The canvas, the caption and Chrome's window are @arraypress/extension-kit's `storeFrame`, as in
+ * the family's other store screenshots. Chrome's own tab right-click menu is native and can't be
+ * captured headlessly, so it is drawn (frame.mjs): Chrome 157 on macOS, items and order from Chromium's tab_menu_model.cc at tag
  * 157.0.8103.39 (Title Case strings on macOS), for a signed-out profile with one window and no
  * tab groups. The extension's submenu has no separator: Chrome drops separators in tab-menu
  * submenus (docs/bug-report/report.md), so that's what users see today.
@@ -27,12 +27,13 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import {
-  H, MENU, MENU_ICONS, THEMES, W, WIN, canvas, cursor, geometry, letterIcon, menu, tabLayout, windowChrome,
-} from './frame.mjs';
+import { storeFrame } from '@arraypress/extension-kit/build';
+import { MENU, MENU_CSS, MENU_ICONS, menu, tabLayout, tabMarks } from './frame.mjs';
 
 /** @import { Page } from 'playwright' */
-/** @import { DrawnTab, Geometry, MenuItem, ThemeName } from './frame.mjs' */
+/** @import { MenuItem, ThemeName } from './frame.mjs' */
+/** @typedef {storeFrame.Tab} DrawnTab */
+/** @typedef {storeFrame.Geometry} Geometry */
 /** @import { MenuEntry } from '../../extension/shared/actions.js' */
 /** @import * as Actions from '../../extension/shared/actions.js' */
 /** @import * as SettingsModule from '../../extension/shared/settings.js' */
@@ -44,6 +45,7 @@ import {
  */
 const MODULES = { actions: '../shared/actions.js', settings: '../shared/settings.js', workspaces: '../shared/workspaces.js' };
 
+const { H, THEMES, W, WIN, canvas, cursor, geometry, letterIcon, windowChrome } = storeFrame;
 const ZOOMED = geometry(1.2);
 const tools = path.dirname(fileURLToPath(import.meta.url));
 const store = path.dirname(tools);
@@ -290,8 +292,8 @@ const OURS_INDEX = 14;
  * @returns {string} The HTML page.
  */
 function menuShot({ caption, tabs, url, urlHost, page, hover, entryList, theme = 'light', clickTab, geo = ZOOMED }) {
-  const layout = tabLayout(tabs, { w: geo.w });
-  const chrome = windowChrome({ tabs, url, urlHost, theme, w: geo.w, layout, ext: [] });
+  const layout = tabLayout(tabs, geo.w);
+  const chrome = windowChrome({ tabs, url, urlHost, theme, w: geo.w, ext: [] });
   const tab = layout[clickTab];
   const mx = WIN.x + tab.x + Math.round(tab.width * 0.45);
   const my = WIN.y + 26;
@@ -305,7 +307,7 @@ function menuShot({ caption, tabs, url, urlHost, page, hover, entryList, theme =
   const sub = menu(subItems, { x: main.x + main.width - 3, y: subY, width: 246, theme });
   const hoverIndex = subItems.findIndex((item) => item.selected);
   const pointer = cursor(sub.x + 150, sub.rowTop(hoverIndex) + 13);
-  return canvas({ caption, theme, chrome, content: page, overlays: main.html + sub.html + pointer, geo });
+  return canvas({ caption, theme, chrome, content: page, overlays: `<style>${MENU_CSS}</style>${main.html}${sub.html}${pointer}`, geo });
 }
 
 /**
@@ -350,7 +352,7 @@ shots.push(menuShot({
    */
   const strip = (list, marks = []) => {
     const tabs = toTabs(list);
-    return windowChrome({ tabs, url: 'trailhead.example/bierstadt-lake-loop', urlHost: 'trailhead.example', layout: tabLayout(tabs, { max: 200 }), marks });
+    return windowChrome({ tabs, url: 'trailhead.example/bierstadt-lake-loop', urlHost: 'trailhead.example' }) + tabMarks(tabs, marks);
   };
   const closedIds = new Set(dup.closed);
   const marks = dup.before.flatMap((tab, i) => (tab.id !== undefined && closedIds.has(tab.id) ? [i] : []));
