@@ -481,6 +481,15 @@ export function fakeBrowser(initialTabs, { focusedWindowId = 1, windows: windowS
       }
       return snapshot().filter((t) => answered.some((a) => a.id === t.id));
     },
+    /**
+     * A page gives itself a new title (an unread count, say).
+     *
+     * @param {number} id - The tab.
+     * @param {string} title - Its new title.
+     */
+    setTitle(id, title) {
+      tabById(id).title = title;
+    },
     /** Turn “Allow access to file URLs” on or off, as on chrome://extensions. */
     setFileAccess(/** @type {boolean} */ allowed) {
       fileAccess = allowed;

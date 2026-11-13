@@ -13,7 +13,8 @@ around it holds the tests, scripts, store assets and docs. Same family setup as 
   and the kit's `startToolbarTheme(chrome)` at top level). `background/worker.js` registers every
   listener on the `chrome` it's given, so `test/worker.test.js` runs the real wiring against an
   in-memory Chrome. `background/menu.js` builds the menu (the kit's `contextMenuBuilder`) and
-  refreshes its live labels; `background/auto-close.js` and `background/recent.js` are below.
+  refreshes its live labels; `background/auto-close.js`, `background/auto-snapshot.js` (both on
+  `background/alarm.js`'s `keepAlarm`) and `background/recent.js` are below.
 - **Nothing that matters lives in the worker's memory**: the menu's items are Chrome's, the closed
   batch (`lastClosed`), the recent tabs (`recentTabs`) and the reopened tabs still to unload (`unload:<id>`)
   are in `chrome.storage.session`, the
@@ -22,7 +23,7 @@ around it holds the tests, scripts, store assets and docs. Same family setup as 
 - **Settings** (`shared/settings.js`: the schema for the kit's settings store) always live in
   `chrome.storage.sync`, so they follow the user through their own Chrome Sync (plain
   preferences, not personal data; the developer receives nothing). `chrome.storage.local` holds the
-  saved workspaces (below), the toolbar glyph's `toolbarDark`, and a write sync refused, until it's
+  saved workspaces and the snapshots (below), the toolbar glyph's `toolbarDark`, and a write sync refused, until it's
   retried (by the options page, and by the worker on install and browser start). The options page
   debounces its writes (the kit's `createSettingsSaver`; sync allows 120 a minute) and follows
   changes made elsewhere with `saver.follow`.
@@ -50,8 +51,10 @@ edit it. `npm install <pkg>` doesn't rerun `postinstall`: run `npm run postinsta
 Kept here because the kit has no equivalent (candidates for it):
 - `background/menu.js`'s own turn-taking around `contextMenuBuilder`: the builder takes the
   items, and this menu's items must be read when the build's turn comes, not when it was asked for.
-- `options/workspaces-section.js` keeping the focus in a list across a redraw (the kit does it
-  inside `createSiteList` only).
+- `options/saved-list.js`: the workspaces' and snapshots' rows, keeping the focus in a list across a
+  redraw (the kit does it inside `createSiteList` only).
+- `options/confirm.js`: Chrome's confirmation dialog (title, a line, Cancel and an action), on the
+  kit's `.dialog` styles; the kit's dialogs always have a field.
 - `store/tools/frame.mjs`: for the store screenshots, Chrome's tab menu drawn as macOS draws it
   (icons, dark theme, a submenu moved up to stay on screen, each row's position: more than the
   kit's `contextMenuHtml` does), outlines over tabs, and a copy of the kit's tab layout, which
@@ -75,7 +78,8 @@ Kept here because the kit has no equivalent (candidates for it):
   `.test-builds/e2e/` (the kit's `buildTestCopy`): `extension/` with `test/e2e/hook.js` as its
   service worker, which exposes `handleMenuClick` and `handleCommand` (what a menu click and a
   shortcut call; Chrome's native tab menu and shortcuts can't be driven headlessly). Then
-  `test/e2e/`: `groups.mjs`, `workspaces.mjs`, `worker.mjs` (shortcuts, and the worker stopped),
+  `test/e2e/`: `groups.mjs`, `workspaces.mjs`, `snapshots.mjs` (export and import, "Open in this
+  window", snapshots, and Chrome's install warnings unchanged), `worker.mjs` (shortcuts, and the worker stopped),
   `auto-close.mjs`, `options.mjs` and `toolbar.mjs` (the last two load `extension/` itself). Each
   runs through the kit's `runChecks` (clean-ups always; a check that hangs fails after 60 s).
   `test/e2e/helpers.mjs` holds what they share (made-up `*.example` sites on a real local server
@@ -168,6 +172,47 @@ What real Chromium does (checked with Playwright's Chromium 156, `test/e2e/works
   adds nothing. Reusing an open group with the same title was rejected: it would pull tabs into another window's
   group, and does nothing for the closed copies that pile up.
 
+## Open in this window, export and import
+- **Open in this window** (`openWorkspace` with `windowId`; the settings page's ⋮ menus only, where "this
+  window" is the page's own): every saved window's tabs are added at the end of that window, pinned ones among
+  its pinned tabs, each saved window's groups made again, none brought to the front, all unloaded as their
+  sites answer. No menu item or command: the tab menu's "Open workspace" submenu would need every name twice.
+- **Export and import** (`shared/transfer.js`, the Workspaces card's "Export and import" row). The file:
+  `{app: "better-tab-actions", kind: "workspaces", version: 1, exported, workspaces: [{name, savedAt, skipped,
+  windows}]}`, downloaded through an `<a download>` on a blob (no `downloads` permission). Reading never trusts
+  it: it must name the app and kind, and a higher `version` is refused (`newer`); each workspace's windows are
+  turned back into open-window shapes and put through `snapshotWindows`, so `reopenable()`, the size limits and
+  `withoutCredentials` are the same code as for a save, bad tabs are left out and counted, and one bad tab never
+  refuses the file. A workspace already kept (same name and windows, `sameKey`) is skipped, so the same file
+  twice adds nothing; nothing is ever replaced; never more than 40. The page shows the preview in `confirm.js`
+  ("2 new workspaces, 1 already here, 3 tabs that can’t be reopened", joined by `Intl.ListFormat`), reads the
+  file again against what's stored when it's confirmed, and the toast's Undo takes the added ones away.
+  Buttons say "Export" and "Import" (no "…": `test/locales.test.js` keeps it for a label cut short).
+
+## Snapshots
+`shared/snapshots.js`, `background/auto-snapshot.js`, `options/snapshots-section.js` (the Snapshots card).
+A snapshot is a workspace's windows (`captureWindows`: groups, window state and size, never incognito) with
+the time and `auto`, in `chrome.storage.local` under `snapshots`, newest first; the row's title is the time
+in the person's language (`dateTime`).
+- **Two pools.** Automatic: at most 20 and 1 MB together, the oldest dropped first (`withAutomatic`). Manual
+  ("Take snapshot"): at most 10 and 512 KB, never dropped; at the limit no more are taken and the card says so.
+  Neither pushes the other out. With the workspaces' 8 MB both fit local's 10 MB (asserted in
+  `test/snapshots.test.js`).
+- **Only when something changed.** An automatic one is skipped when `layoutKey` (windows, each tab's address,
+  pinned and group in order, groups' titles and colours) equals the newest snapshot's: not for a new title,
+  another tab in front, or a moved window.
+- **Never silent.** `takeSnapshot` answers `kept`, `unchanged`, `nothing`, `full` or `failed`. If Chrome's
+  storage refuses an automatic one, older automatic ones go one at a time until it fits; if it's the only one
+  left and still refused, `snapshotProblem` is set in `chrome.storage.session` and the card shows a line until
+  one is kept. A manual one's result is the toast.
+- **The alarm** (`take-snapshot`, every `snapshotMinutes`: 5, 15, 30 or 60; synced settings `autoSnapshot`,
+  off by default). `keepAlarm` (also behind automatic closing) leaves a running alarm alone; when it makes one
+  (turned on, or the time changed) a snapshot is taken at once. No awake clock: a missed alarm fires once on
+  waking, and takes one snapshot only if something changed.
+- "Take snapshot" on the settings page leaves the settings tab out (as "Replace with current windows" does);
+  an automatic one keeps every window. "Save as workspace" copies it (named by `workspaceName`); the snapshot
+  stays. No menu item or command for now: the menu is already thirteen items.
+
 ## Close unused tabs automatically
 `background/auto-close.js`: an alarm (`close-unused-tabs`, every `CHECK_MINUTES` = 5) while `autoClose` is on
 closes tabs `unused()` (shared with "Close tabs not used in N days" in `shared/actions.js`) for `autoCloseHours`
@@ -223,11 +268,11 @@ quotes and apostrophes, "…" only when something asks for more input.
   text is `data-i18n` (filled by the kit's `setUpPage`); scripts look words up through
   `shared/text.js` `Words` (`{t, lang}`: the kit's `translator` and Chrome's UI language, from
   `wordsOf(chrome.i18n)` in the worker, `setUpPage`'s `t` on the page). `menuEntries`, `menuTitle`,
-  `duration` and `workspaceSummary` take the words as an argument, so tests pass the real messages.
+  `duration`, `minutesText`, `workspaceSummary` and `snapshotSummary` take the words as an argument, so tests pass the real messages.
 - An action's `message` is its name's key, and the same message is its command's description in
   the manifest (`test/actions.test.js` holds them together). Counts are the kit's `counted` with a
   pair of messages, `xOne` (“1 day”) and `x` (“$COUNT$ days”): the menu's days and closed tabs,
-  the ages, a workspace's windows and tabs.
+  the ages, a workspace's windows and tabs, an import's parts.
 - Messages that name the extension take it as `$NAME$` (content `$1`), filled from `extShortName`
   by the kit; the manifest's own messages can't, so `toolbarTitle` writes it out.
 - Two messages name menu items, shown in bold (`options.js` `showWithNames`): the names are

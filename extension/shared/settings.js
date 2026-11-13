@@ -26,6 +26,8 @@ import { createSettingsStore, MAX_SYNC_ITEM_BYTES, siteHost, syncItemBytes } fro
  * @property {string[]} keepSites Sites whose tabs are never closed automatically ("Never close tabs from these sites").
  * @property {boolean} reopenGroups Whether opening a workspace makes its tab groups again (Chrome
  *   adds each group it makes to its saved tab groups, so reopening adds another copy each time).
+ * @property {boolean} autoSnapshot Whether snapshots of the open windows are taken automatically (off by default).
+ * @property {number} snapshotMinutes How often, while they change: one of {@link SNAPSHOT_MINUTES}.
  */
 
 /** The fewest days "Close tabs not used in N days" accepts. */
@@ -35,6 +37,9 @@ const MAX_DAYS = 365;
 
 /** The ages "Close unused tabs automatically" offers, in hours: 1, 4 and 12 hours, 1 and 3 days, 1 week. */
 export const AUTO_CLOSE_HOURS = /** @type {readonly number[]} */ (Object.freeze([1, 4, 12, 24, 72, 168]));
+
+/** How often "Take snapshots automatically" offers to take one, in minutes: 5, 15 and 30 minutes, 1 hour. */
+export const SNAPSHOT_MINUTES = /** @type {readonly number[]} */ (Object.freeze([5, 15, 30, 60]));
 
 /**
  * The never-close sites, valid and without repeats, cut where the list would no longer fit one
@@ -56,7 +61,8 @@ function keepSitesFrom(raw) {
 
 /**
  * Every setting's default: every action shown, this window, 7 days, grouped tabs included, no
- * automatic closing (1 week once it's on, no sites kept), workspaces' groups reopened.
+ * automatic closing (1 week once it's on, no sites kept), workspaces' groups reopened, no
+ * automatic snapshots (every 15 minutes once they're on).
  */
 export const DEFAULTS = /** @type {Readonly<Settings>} */ (Object.freeze({
   hiddenActions: [],
@@ -67,6 +73,8 @@ export const DEFAULTS = /** @type {Readonly<Settings>} */ (Object.freeze({
   autoCloseHours: 168,
   keepSites: [],
   reopenGroups: true,
+  autoSnapshot: false,
+  snapshotMinutes: 15,
 }));
 
 /**
@@ -85,7 +93,8 @@ const numberFrom = (raw) => (typeof raw === 'number' || (typeof raw === 'string'
 /**
  * Coerce anything read from storage (or a form) into valid settings: junk
  * falls back to the default, days are rounded and clamped, hidden actions
- * de-duplicated, the automatic age is one offered, kept sites are valid hosts.
+ * de-duplicated, the automatic age and the snapshot interval are ones offered, kept sites are
+ * valid hosts.
  *
  * @param {Record<string, unknown>} [raw] - Stored or typed values; missing ones take the default.
  * @returns {Settings} Valid settings.
@@ -96,6 +105,7 @@ const numberFrom = (raw) => (typeof raw === 'number' || (typeof raw === 'string'
 export function normalizeSettings(raw = {}) {
   const days = Math.round(numberFrom(raw.inactiveDays));
   const hours = numberFrom(raw.autoCloseHours);
+  const minutes = numberFrom(raw.snapshotMinutes);
   return {
     hiddenActions: Array.isArray(raw.hiddenActions)
       ? [...new Set(raw.hiddenActions.filter((id) => typeof id === 'string'))]
@@ -107,6 +117,8 @@ export function normalizeSettings(raw = {}) {
     autoCloseHours: AUTO_CLOSE_HOURS.includes(hours) ? hours : DEFAULTS.autoCloseHours,
     keepSites: keepSitesFrom(raw.keepSites),
     reopenGroups: typeof raw.reopenGroups === 'boolean' ? raw.reopenGroups : DEFAULTS.reopenGroups,
+    autoSnapshot: typeof raw.autoSnapshot === 'boolean' ? raw.autoSnapshot : DEFAULTS.autoSnapshot,
+    snapshotMinutes: SNAPSHOT_MINUTES.includes(minutes) ? minutes : DEFAULTS.snapshotMinutes,
   };
 }
 

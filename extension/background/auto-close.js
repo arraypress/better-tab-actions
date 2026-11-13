@@ -26,7 +26,9 @@ import { unused } from '../shared/actions.js';
 import { tabUrl } from '../shared/sites.js';
 import { recordClosed } from '../shared/undo.js';
 import { onSite, siteHost } from '../vendor/extension-kit/index.js';
+import { keepAlarm } from './alarm.js';
 
+/** @import { AlarmsApi } from './alarm.js' */
 /** @import { Settings } from '../shared/settings.js' */
 /** @import { Tab } from '../shared/sites.js' */
 /** @import { StorageArea } from '../vendor/extension-kit/settings/storage.js' */
@@ -65,16 +67,6 @@ export const MAX_AWAY = 200;
  * }} tabs `chrome.tabs`.
  * @property {StorageArea} session `chrome.storage.session`, for the closed batch.
  * @property {StorageArea} local `chrome.storage.local`, for the awake clock.
- */
-
-/**
- * The chrome.alarms slice the schedule uses.
- *
- * @typedef {{
- *   get(name: string): Promise<chrome.alarms.Alarm | undefined>,
- *   create(name: string, info: chrome.alarms.AlarmCreateInfo): Promise<void>,
- *   clear(name: string): Promise<boolean>,
- * }} AlarmsApi
  */
 
 /**
@@ -188,10 +180,9 @@ export async function closeUnusedTabs({ tabs, session, local }, settings, now) {
  */
 export async function scheduleAutoClose({ alarms, local }, settings, now) {
   if (!settings.autoClose) {
-    await Promise.all([alarms.clear(AUTO_CLOSE_ALARM), local.remove(AWAKE_KEY)]);
+    await Promise.all([keepAlarm(alarms, AUTO_CLOSE_ALARM, 0), local.remove(AWAKE_KEY)]);
     return;
   }
   if (!(await loadClock(local))) await local.set({ [AWAKE_KEY]: startClock(now) });
-  if ((await alarms.get(AUTO_CLOSE_ALARM))?.periodInMinutes === CHECK_MINUTES) return;
-  await alarms.create(AUTO_CLOSE_ALARM, { delayInMinutes: CHECK_MINUTES, periodInMinutes: CHECK_MINUTES });
+  await keepAlarm(alarms, AUTO_CLOSE_ALARM, CHECK_MINUTES);
 }

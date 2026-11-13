@@ -4,3 +4,5 @@
 .days { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; color: var(--text-secondary); }
 /* `end`, not `right`: the number sits beside its unit on a right-to-left page too. */
 #inactiveDays { width: 72px; text-align: end; }
+/* Two buttons at a row's end (Import, Export). */
+.buttons { display: inline-flex; gap: 8px; }

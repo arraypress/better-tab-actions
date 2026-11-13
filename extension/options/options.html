@@ -40,6 +40,45 @@
         </span>
         <input id="reopenGroups" type="checkbox" class="switch" role="switch">
       </label>
+      <div class="row two-line">
+        <span class="label">
+          <span data-i18n="optionsTransfer"></span>
+          <span class="secondary" data-i18n="optionsTransferSub"></span>
+        </span>
+        <span class="buttons">
+          <button id="import-workspaces" type="button" data-i18n="optionsImport"></button>
+          <button id="export-workspaces" type="button" data-i18n="optionsExport"></button>
+        </span>
+        <input id="import-file" type="file" accept=".json,application/json" hidden>
+      </div>
+    </section>
+
+    <h2 class="section-title" id="snapshots" data-i18n="optionsSnapshotsHeading"></h2>
+    <section class="card" aria-labelledby="snapshots">
+      <label class="row two-line">
+        <span class="label">
+          <span data-i18n="optionsAutoSnapshot"></span>
+          <span class="secondary" data-i18n="optionsAutoSnapshotSub"></span>
+        </span>
+        <input id="autoSnapshot" type="checkbox" class="switch" role="switch">
+      </label>
+      <div id="auto-snapshot-options" class="row two-line" hidden>
+        <label class="label" for="snapshotMinutes">
+          <span data-i18n="optionsSnapshotEvery"></span>
+          <span class="secondary" id="snapshot-every-sub"></span>
+        </label>
+        <select id="snapshotMinutes"></select>
+      </div>
+      <div class="row two-line">
+        <span class="label">
+          <span data-i18n="optionsSnapshotNow"></span>
+          <span class="secondary" data-i18n="optionsSnapshotNowSub"></span>
+        </span>
+        <button id="take-snapshot" type="button" data-i18n="optionsTakeSnapshot"></button>
+      </div>
+      <p id="snapshot-problem" class="row text" role="status" hidden><span class="label" data-i18n="snapshotProblem"></span></p>
+      <p id="snapshots-full" class="row text" hidden><span class="label" id="snapshots-full-text"></span></p>
+      <ul id="snapshot-list" class="list" aria-labelledby="snapshots"></ul>
     </section>
 
     <h2 class="section-title" id="h-closing" data-i18n="optionsClosingHeading"></h2>
@@ -131,7 +170,8 @@
     </section>
   </main>
 
-  <!-- The ⋮ menus, the one-field dialog and the toast come from the kit (createMenu, askText, createToast). -->
+  <!-- The ⋮ menus, the one-field dialog and the toast come from the kit (createMenu, askText, createToast);
+       the import confirmation is confirm.js, on the kit's dialog styles. -->
   <script type="module" src="options.js"></script>
 </body>
 </html>

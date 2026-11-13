@@ -28,6 +28,11 @@ Right-click any tab → **More tab actions**:
 - **Close unused tabs automatically** (off until you turn it on): closes tabs you haven’t used for
   the time you pick, counting only time Chrome is open and your computer is awake, from when you
   turn it on. They can be reopened with “Reopen closed tabs”.
+- **Workspaces on the settings page**: open one in new windows or in the window you’re in,
+  rename, replace or delete it; export them all to a file and import it on another computer
+  (nothing is replaced, and you’re told what will be added first).
+- **Snapshots**: take a copy of all your windows when you like, or automatically every 5 to 60
+  minutes while your tabs change (off until you turn it on). Open one, or save it as a workspace.
 - **Keyboard**: every action can have a shortcut, and so can “Switch to last used tab”, which goes
   back to the tab you were just on, even in another window. None is set to begin with: choose
   your own at chrome://extensions/shortcuts.
@@ -46,7 +51,7 @@ Right-click any tab → **More tab actions**:
   workspace does that once; all but the tab in front are then unloaded as soon as their sites
   answer, and load in full when you click them.
 - A password written in an address (`https://name:password@site/`) is never saved in a workspace.
-- Settings sync through Chrome Sync; workspaces stay on this computer.
+- Settings sync through Chrome Sync; workspaces and snapshots stay on this computer.
 
 ## Privacy
 
@@ -60,12 +65,12 @@ Nothing is collected or sent anywhere: no network requests, no analytics, no acc
 | `contextMenus` | The “More tab actions” submenu on the tab right-click menu |
 | `tabs` | Reading tab addresses and titles to find a site’s tabs, duplicates and unused tabs |
 | `tabGroups` | Naming the group when you save a window as a group |
-| `storage` | Your settings; the last closed tabs so they can be reopened; your workspaces (on this computer only, never synced) |
+| `storage` | Your settings; the last closed tabs so they can be reopened; your workspaces and snapshots (on this computer only, never synced) |
 | `offscreen` | A tiny hidden page that tells whether Chrome is in light or dark mode, for the toolbar icon |
-| `alarms` | Checking for unused tabs every few minutes, while “Close unused tabs automatically” is on |
+| `alarms` | Checking for unused tabs every few minutes, while “Close unused tabs automatically” is on; taking a snapshot, while “Take snapshots automatically” is on |
 
 Chrome shows “Read your browsing history” (for `tabs`) and “View and manage your tab groups”
-(for `tabGroups`) when you install it. Workspaces need no other permission, and `alarms` shows no
+(for `tabGroups`) when you install it. Workspaces, their export and import, and snapshots need no other permission, and `alarms` shows no
 warning (the e2e check asks Chrome for the manifest’s warnings, with and without it).
 
 ## Install from source

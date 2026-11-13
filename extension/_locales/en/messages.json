@@ -378,5 +378,190 @@
   },
   "toastUndo": {
     "message": "Undo"
+  },
+  "workspaceOpenHere": {
+    "message": "Open in this window"
+  },
+  "optionsTransfer": {
+    "message": "Export and import"
+  },
+  "optionsTransferSub": {
+    "message": "Keep a copy in a file, or move your workspaces to another computer"
+  },
+  "optionsExport": {
+    "message": "Export"
+  },
+  "optionsImport": {
+    "message": "Import"
+  },
+  "importTitle": {
+    "message": "Import workspaces"
+  },
+  "importNewOne": {
+    "message": "1 new workspace"
+  },
+  "importNew": {
+    "message": "$COUNT$ new workspaces",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "importExistingOne": {
+    "message": "1 already here"
+  },
+  "importExisting": {
+    "message": "$COUNT$ already here",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "importSkippedOne": {
+    "message": "1 tab that can’t be reopened"
+  },
+  "importSkipped": {
+    "message": "$COUNT$ tabs that can’t be reopened",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "importNoRoomOne": {
+    "message": "1 over the limit"
+  },
+  "importNoRoom": {
+    "message": "$COUNT$ over the limit",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "importNotOurs": {
+    "message": "That isn’t a $NAME$ workspaces file",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "importNewer": {
+    "message": "That file is from a newer version of $NAME$. Update the extension, then import it again.",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "importNothing": {
+    "message": "Nothing new to import"
+  },
+  "importNothingBecause": {
+    "message": "Nothing new to import: $DETAILS$",
+    "placeholders": {
+      "details": {
+        "content": "$1"
+      }
+    }
+  },
+  "toastImportedOne": {
+    "message": "Imported 1 workspace"
+  },
+  "toastImported": {
+    "message": "Imported $COUNT$ workspaces",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "toastExportedOne": {
+    "message": "Exported 1 workspace"
+  },
+  "toastExported": {
+    "message": "Exported $COUNT$ workspaces",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsSnapshotsHeading": {
+    "message": "Snapshots"
+  },
+  "optionsAutoSnapshot": {
+    "message": "Take snapshots automatically"
+  },
+  "optionsAutoSnapshotSub": {
+    "message": "Keeps copies of your windows as they change, on this computer only, so you can bring tabs back"
+  },
+  "optionsSnapshotEvery": {
+    "message": "Take a snapshot every"
+  },
+  "optionsSnapshotEverySub": {
+    "message": "Only after tabs are opened, closed, moved, pinned or grouped. The newest $COUNT$ are kept.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "durationMinutesOne": {
+    "message": "1 minute"
+  },
+  "durationMinutes": {
+    "message": "$COUNT$ minutes",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "optionsSnapshotNow": {
+    "message": "Take a snapshot now"
+  },
+  "optionsSnapshotNowSub": {
+    "message": "Kept until you delete it"
+  },
+  "optionsTakeSnapshot": {
+    "message": "Take snapshot"
+  },
+  "snapshotsFull": {
+    "message": "You can keep up to $COUNT$ snapshots you’ve taken yourself. Delete one to take another.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "snapshotProblem": {
+    "message": "The last snapshot couldn’t be kept, as this extension’s storage is full. Delete a workspace or a snapshot to make room."
+  },
+  "snapshotAutomatic": {
+    "message": "Automatic"
+  },
+  "snapshotManual": {
+    "message": "Taken by you"
+  },
+  "snapshotSaveAs": {
+    "message": "Save as workspace"
+  },
+  "toastSnapshotTaken": {
+    "message": "Snapshot taken"
+  },
+  "toastSnapshotNothing": {
+    "message": "No open tab can be reopened, so there’s nothing to keep"
+  },
+  "toastSavedAs": {
+    "message": "Saved as workspace “$WORKSPACE$”",
+    "placeholders": {
+      "workspace": {
+        "content": "$1"
+      }
+    }
   }
 }

@@ -13,8 +13,10 @@ import { ACTIONS, MENU_MESSAGE, menuEntries, SWITCH_LAST } from '../extension/sh
 import { AUTO_CLOSE_ALARM, AWAKE_KEY, CHECK_MINUTES, HOUR_MS } from '../extension/background/auto-close.js';
 import { menuItems, PARENT_ID, REFRESH_MS } from '../extension/background/menu.js';
 import { startWorker, WORKSPACES_PAGE } from '../extension/background/worker.js';
+import { SNAPSHOT_ALARM } from '../extension/background/auto-snapshot.js';
 import { RECENT_KEY } from '../extension/background/recent.js';
 import { normalizeSettings } from '../extension/shared/settings.js';
+import { loadSnapshots } from '../extension/shared/snapshots.js';
 import { closedCount } from '../extension/shared/undo.js';
 import { loadWorkspaces } from '../extension/shared/workspaces.js';
 import { EXTENSION_ID } from './fake-browser.js';
@@ -254,6 +256,35 @@ test('automatic closing: the alarm follows the setting, and each alarm closes th
   await chrome.api.storage.sync.set({ autoClose: false });
   await until(() => chrome.alarms.all.size === 0, 'the alarm to be cleared');
   await until(async () => !(AWAKE_KEY in await chrome.api.storage.local.get(AWAKE_KEY)), 'the clock to go');
+});
+
+test('automatic snapshots: the alarm follows the setting; one is taken when it’s turned on, then at each alarm only if the windows changed', async () => {
+  const { chrome } = await installed();
+  const snapshots = () => loadSnapshots(chrome.api.storage.local);
+  assert.equal(chrome.alarms.all.size, 0, 'off by default: no alarm');
+  assert.deepEqual(await snapshots(), []);
+
+  await chrome.api.storage.sync.set(normalizeSettings({ autoSnapshot: true, snapshotMinutes: 30 }));
+  await until(() => chrome.alarms.all.get(SNAPSHOT_ALARM)?.periodInMinutes === 30, 'the alarm');
+  await until(async () => (await snapshots()).length === 1, 'the first snapshot');
+  const alarm = /** @type {chrome.alarms.Alarm} */ (chrome.alarms.all.get(SNAPSHOT_ALARM));
+  await chrome.alarms.onAlarm.fire(alarm);
+  assert.equal((await snapshots()).length, 1, 'nothing changed: none taken');
+  await chrome.tabs.create({ windowId: 1, url: 'https://new.com/' });
+  await chrome.alarms.onAlarm.fire(alarm);
+  assert.deepEqual((await snapshots()).map((s) => [s.auto, s.windows[0].tabs.length]), [[true, 4], [true, 3]]);
+
+  // The worker starting again (a browser start) neither resets the alarm nor takes another.
+  const creates = chrome.alarms.creates;
+  await chrome.runtime.onStartup.fire();
+  assert.equal(chrome.alarms.creates, creates);
+  assert.equal((await snapshots()).length, 2);
+
+  await chrome.api.storage.sync.set({ autoSnapshot: false });
+  await until(() => chrome.alarms.all.size === 0, 'the alarm to be cleared');
+  await chrome.tabs.create({ windowId: 1, url: 'https://later.com/' });
+  await chrome.alarms.onAlarm.fire(alarm); // A last alarm already on its way does nothing.
+  assert.equal((await snapshots()).length, 2, 'the snapshots stay, and no more are taken');
 });
 
 test('the toolbar button opens the settings page', async () => {

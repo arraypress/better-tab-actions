@@ -9,7 +9,7 @@
 import { EXTENSION_ID, fakeBrowser } from './fake-browser.js';
 import { I18N } from './helpers.js';
 
-/** @import { AlarmsApi } from '../extension/background/auto-close.js' */
+/** @import { AlarmsApi } from '../extension/background/alarm.js' */
 /** @import { TabSeed } from './fake-browser.js' */
 
 /** @type {Set<Set<(...args: any[]) => unknown>>} Every fake event's listeners, for {@link dropListeners}. */

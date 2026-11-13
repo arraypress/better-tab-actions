@@ -1,6 +1,7 @@
 /**
  * The options page: which actions the menu shows, the saved workspaces
- * (workspaces-section.js) and whether their groups reopen, how closing works
+ * (workspaces-section.js) and whether their groups reopen, the snapshots
+ * (snapshots-section.js) and whether they're taken automatically, how closing works
  * (automatic closing and its never-close sites, the kit's site list), the
  * keyboard shortcuts that are set, and the About card. Changes show at
  * once and are written once the clicks stop (Chrome Sync allows 120 writes a
@@ -15,9 +16,11 @@ import {
 } from '../vendor/extension-kit/index.js';
 import { ABOUT_LINKS } from './about-links.js';
 import { ACTIONS, MENU_MESSAGE, menuTitle, SWITCH_LAST, SWITCH_LAST_MESSAGE } from '../shared/actions.js';
-import { AUTO_CLOSE_HOURS, normalizeSettings, settingsStore } from '../shared/settings.js';
-import { duration } from '../shared/text.js';
+import { AUTO_CLOSE_HOURS, normalizeSettings, settingsStore, SNAPSHOT_MINUTES } from '../shared/settings.js';
+import { MAX_AUTO } from '../shared/snapshots.js';
+import { duration, minutesText } from '../shared/text.js';
 import { MAX_WORKSPACES } from '../shared/workspaces.js';
+import { startSnapshots } from './snapshots-section.js';
 import { startWorkspaces } from './workspaces-section.js';
 
 /** @import { Action } from '../shared/actions.js' */
@@ -37,6 +40,10 @@ const reopenGroups = byId('reopenGroups', HTMLInputElement);
 const autoClose = byId('autoClose', HTMLInputElement);
 const autoCloseHours = byId('autoCloseHours', HTMLSelectElement);
 autoCloseHours.append(...AUTO_CLOSE_HOURS.map((hours) => new Option(duration(hours, words), String(hours))));
+const autoSnapshot = byId('autoSnapshot', HTMLInputElement);
+const snapshotMinutes = byId('snapshotMinutes', HTMLSelectElement);
+snapshotMinutes.append(...SNAPSHOT_MINUTES.map((minutes) => new Option(minutesText(minutes, words), String(minutes))));
+byId('snapshot-every-sub').textContent = t('optionsSnapshotEverySub', [String(MAX_AUTO)]);
 
 let settings = await settingsStore.load(chrome.storage);
 const flash = statusFlasher(byId('status'), 1500);
@@ -127,7 +134,7 @@ function save(changes) {
   render();
 }
 
-/** Show the settings: the Menu card's switches, and the Closing tabs and Workspaces cards' controls. */
+/** Show the settings: the Menu card's switches, and the Workspaces, Snapshots and Closing tabs cards' controls. */
 function render() {
   renderMenuItems();
   windowScope.value = settings.windowScope;
@@ -140,6 +147,9 @@ function render() {
   autoCloseHours.value = String(settings.autoCloseHours);
   byId('auto-close-options').hidden = !settings.autoClose;
   keepSites.render(settings.keepSites);
+  autoSnapshot.checked = settings.autoSnapshot;
+  snapshotMinutes.value = String(settings.snapshotMinutes);
+  byId('auto-snapshot-options').hidden = !settings.autoSnapshot;
 }
 
 windowScope.addEventListener('change', () => save({ windowScope: windowScope.value }));
@@ -147,6 +157,8 @@ includeGroupedTabs.addEventListener('change', () => save({ includeGroupedTabs: i
 reopenGroups.addEventListener('change', () => save({ reopenGroups: reopenGroups.checked }));
 autoClose.addEventListener('change', () => save({ autoClose: autoClose.checked }));
 autoCloseHours.addEventListener('change', () => save({ autoCloseHours: autoCloseHours.value }));
+autoSnapshot.addEventListener('change', () => save({ autoSnapshot: autoSnapshot.checked }));
+snapshotMinutes.addEventListener('change', () => save({ snapshotMinutes: snapshotMinutes.value }));
 byId('memory-saver').addEventListener('click', () => {
   chrome.tabs.create({ url: 'chrome://settings/performance' });
 });
@@ -180,4 +192,4 @@ setAboutLinks(ABOUT_LINKS);
 
 render();
 renderShortcuts();
-startWorkspaces(() => settings, words);
+startSnapshots(() => settings, words, await startWorkspaces(() => settings, words));

@@ -154,6 +154,8 @@ await runChecks(runner, async () => {
       const began = Date.now();
       assert.equal((await click(worker, 'open-workspace:slow', tabId)).length, 3);
       assert.ok(Date.now() - began < SLOW_MS, 'opening didn’t wait for the slow site');
+      // The quick site's tab is unloaded within moments (as it answers); the slow one is still waiting.
+      await until(async () => (await describeWindows(worker, start))[0]?.tabs[2] === `${DOCS_2} unloaded`, 'the quick tab to be unloaded', SLOW_MS - 1000);
       assert.deepEqual((await describeWindows(worker, start)).map((win) => win.tabs), [[DOCS_1, `(waiting for ${SLOW})`, `${DOCS_2} unloaded`]]);
       // Chrome stops the idle worker; the tab reporting its address starts it again.
       await stopWorker(launched, { start: false });
@@ -217,7 +219,7 @@ await runChecks(runner, async () => {
   /** @param {string} name - A menu item. */
   const choose = async (name) => {
     await rows.first().getByRole('button', { name: /^More actions for/ }).click();
-    await page.getByRole('menuitem', { name }).click();
+    await page.getByRole('menuitem', { name, exact: true }).click();
   };
   /** What has the keyboard focus: its accessible name, or its id. */
   const focused = () => page.evaluate(() => document.activeElement?.getAttribute('aria-label') ?? document.activeElement?.id ?? '');

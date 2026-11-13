@@ -8,10 +8,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeChromeStorage } from '@arraypress/extension-kit/testing';
 import { ACTIONS } from '../extension/shared/actions.js';
-import { AUTO_CLOSE_HOURS, DEFAULTS, normalizeSettings, settingsStore } from '../extension/shared/settings.js';
+import { AUTO_CLOSE_HOURS, DEFAULTS, normalizeSettings, settingsStore, SNAPSHOT_MINUTES } from '../extension/shared/settings.js';
 
-test('defaults: every action shown, this window, 7 days, grouped tabs included, no automatic closing, workspaces’ groups reopened', () => {
-  assert.deepEqual(DEFAULTS, {
+test('defaults: every action shown, this window, 7 days, grouped tabs included, no automatic closing, workspaces’ groups reopened, no automatic snapshots', () => {
+  const { autoSnapshot, snapshotMinutes, ...rest } = DEFAULTS;
+  assert.deepEqual([autoSnapshot, snapshotMinutes], [false, 15]);
+  assert.deepEqual(rest, {
     hiddenActions: [],
     inactiveDays: 7,
     windowScope: 'window',
@@ -21,6 +23,14 @@ test('defaults: every action shown, this window, 7 days, grouped tabs included, 
     keepSites: [],
     reopenGroups: true,
   });
+});
+
+test('normalizeSettings: snapshots are on or off, every 5, 15, 30 or 60 minutes', () => {
+  assert.deepEqual(SNAPSHOT_MINUTES, [5, 15, 30, 60]);
+  const { autoSnapshot, snapshotMinutes } = normalizeSettings({ autoSnapshot: true, snapshotMinutes: '30' });
+  assert.deepEqual([autoSnapshot, snapshotMinutes], [true, 30]);
+  const junk = normalizeSettings({ autoSnapshot: 'yes', snapshotMinutes: 1 });
+  assert.deepEqual([junk.autoSnapshot, junk.snapshotMinutes], [false, 15]);
 });
 
 test('normalizeSettings: fills missing values from defaults', () => {

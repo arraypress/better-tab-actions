@@ -11,8 +11,8 @@ import { menuEntries, menuState, MANAGE_WORKSPACES, WORKSPACE_ITEM_PREFIX } from
 import { DEFAULTS, normalizeSettings } from '../extension/shared/settings.js';
 import { MAX_URL, withoutCredentials } from '../extension/shared/sites.js';
 import {
-  loadWorkspaces, MAX_BYTES, MAX_TABS, MAX_TITLE, MAX_WORKSPACES, MENU_WORKSPACES, reopenable, reopenPlan,
-  replaceWorkspace, snapshotWindows, unloadIfAnswered, UNLOAD_PREFIX, updateWorkspaces, workspaceName, workspaceSummary,
+  layoutKey, loadWorkspaces, MAX_BYTES, MAX_TABS, MAX_TITLE, MAX_WORKSPACES, MENU_WORKSPACES, reopenable, reopenPlan,
+  openWorkspace, replaceWorkspace, snapshotWindows, unloadIfAnswered, UNLOAD_PREFIX, updateWorkspaces, workspaceName, workspaceSummary,
 } from '../extension/shared/workspaces.js';
 import { EXTENSION_ID, fakeBrowser, runOn, SCREEN } from './fake-browser.js';
 import { errorsLogged, WORDS } from './helpers.js';
@@ -333,6 +333,57 @@ test('open-workspace: a tab whose site hasn’t answered is never discarded (it 
   const other = await b.tabs.create({ windowId: win, url: 'https://c.com/' });
   assert.equal(await unloadIfAnswered(b, other.id), other.id);
   assert.equal(b.tab(other.id)?.discarded, false);
+});
+
+test('“Open in this window”: every saved window’s tabs at the end of an open window, in order, pinned among its pinned tabs, groups kept, none in front, all unloaded', async () => {
+  const b = twoWindows();
+  await groupReading(b);
+  await run(b, 'save-workspace', 2);
+  const [workspace] = await loadWorkspaces(b.local);
+  await b.windows.remove(1);
+  await b.windows.remove(2);
+  const here = await b.windows.create({ url: ['https://pinned.com/', 'https://here.com/'] });
+  await b.tabs.update(here.tabs[0].id, { pinned: true });
+  await b.tabs.update(here.tabs[1].id, { active: true });
+  const before = b.windowIds.length;
+
+  const opened = await openWorkspace(b, workspace, { reopenGroups: true, windowId: here.id });
+  assert.equal(opened.length, 6);
+  assert.equal(b.windowIds.length, before, 'no new window');
+  assert.deepEqual(b.described(here.id), [
+    'https://pinned.com/ pinned',
+    'https://mail.com/ pinned discarded',
+    'https://here.com/',
+    'https://github.com/a discarded',
+    'https://github.com/b discarded [Reading]',
+    'https://news.com/ discarded [Reading]',
+    'https://docs.com/ discarded',
+    'https://docs.com/2 discarded',
+  ]);
+  assert.equal(b.tab(here.tabs[1].id)?.active, true, 'the tab in front stays in front');
+
+  const plain = await b.windows.create({ url: 'https://solo.com/' });
+  await openWorkspace(b, workspace, { reopenGroups: false, windowId: plain.id });
+  assert.ok(b.described(plain.id).every((tab) => !tab.includes('[')), 'ungrouped when groups aren’t reopened');
+});
+
+test('layoutKey: the same for a new title, another tab in front or a moved window; different once a tab is opened, moved, pinned or grouped', () => {
+  /** @type {WorkspaceWindow} */
+  const win = {
+    state: 'normal', left: 0, top: 0, width: 800, height: 600, active: 0, groups: [{ title: 'G', color: 'red', collapsed: false }],
+    tabs: [{ url: 'https://a.com/', title: 'Inbox' }, { url: 'https://b.com/', title: 'B', group: 0 }],
+  };
+  const key = layoutKey([win]);
+  assert.equal(layoutKey([{ ...win, state: 'maximized', left: 50, active: 1, focused: true, tabs: [{ ...win.tabs[0], title: '(3) Inbox' }, win.tabs[1]], groups: [{ ...win.groups[0], collapsed: true }] }]), key);
+  const changes = {
+    opened: [{ ...win, tabs: [...win.tabs, { url: 'https://c.com/', title: '' }] }],
+    moved: [{ ...win, tabs: [{ ...win.tabs[1], group: undefined }, { ...win.tabs[0], group: 0 }] }],
+    pinned: [{ ...win, tabs: [{ ...win.tabs[0], pinned: /** @type {const} */ (true) }, win.tabs[1]] }],
+    ungrouped: [{ ...win, groups: [], tabs: win.tabs.map(({ url, title }) => ({ url, title })) }],
+    renamedGroup: [{ ...win, groups: [{ ...win.groups[0], title: 'H' }] }],
+    secondWindow: [win, savedWindow('https://a.com/')],
+  };
+  for (const [what, windows] of Object.entries(changes)) assert.notEqual(layoutKey(windows), key, what);
 });
 
 test('open-workspace: a window saved on a screen that’s gone opens where Chrome puts it, at its size (fitted to this screen)', async () => {

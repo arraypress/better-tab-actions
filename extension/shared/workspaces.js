@@ -199,7 +199,7 @@ export function reopenable(url, fileAccess) {
  * @param {unknown} value - Anything.
  * @returns {number} Its JSON's size in bytes, as storage counts it.
  */
-const jsonBytes = (value) => new TextEncoder().encode(JSON.stringify(value)).length;
+export const jsonBytes = (value) => new TextEncoder().encode(JSON.stringify(value)).length;
 
 /**
  * What a workspace keeps of some open windows: normal windows only (no incognito, popup or app
@@ -290,6 +290,18 @@ export function workspaceName(windows, now, locale) {
 }
 
 /**
+ * How many windows and tabs some saved windows hold, in words.
+ *
+ * @param {readonly WorkspaceWindow[]} windows - The saved windows.
+ * @param {Words} words - The extension's words.
+ * @returns {[string, string]} "2 windows" and "24 tabs".
+ */
+export function sizeSummary(windows, words) {
+  const tabs = windows.reduce((sum, win) => sum + win.tabs.length, 0);
+  return [counted(windows.length, 'summaryWindowsOne', 'summaryWindows', words), counted(tabs, 'summaryTabsOne', 'summaryTabs', words)];
+}
+
+/**
  * How a workspace's row describes it: windows, tabs, the day it was saved, and any tabs that
  * weren't saved.
  *
@@ -299,12 +311,7 @@ export function workspaceName(windows, now, locale) {
  * @returns {string} "2 windows · 24 tabs · Saved 9 Nov", plus " · 3 tabs not saved".
  */
 export function workspaceSummary({ windows, skipped, savedAt }, now, words) {
-  const tabs = windows.reduce((sum, win) => sum + win.tabs.length, 0);
-  const parts = [
-    counted(windows.length, 'summaryWindowsOne', 'summaryWindows', words),
-    counted(tabs, 'summaryTabsOne', 'summaryTabs', words),
-    words.t('summarySaved', [shortDate(savedAt, words.lang, now)]),
-  ];
+  const parts = [...sizeSummary(windows, words), words.t('summarySaved', [shortDate(savedAt, words.lang, now)])];
   if (skipped) parts.push(counted(skipped, 'summaryNotSavedOne', 'summaryNotSaved', words));
   return parts.join(' · ');
 }
@@ -314,7 +321,7 @@ export function workspaceSummary({ windows, skipped, savedAt }, now, words) {
  * the tabs to add around it, the groups to make and the state to end in. The focused window is
  * the one saved as focused, else the first.
  *
- * @param {Workspace} workspace - The workspace.
+ * @param {Pick<Workspace, 'windows'>} workspace - The workspace.
  * @param {{reopenGroups: boolean}} options - Whether to make its tab groups again.
  * @returns {WindowPlan[]} One plan per window, in order.
  */
@@ -435,6 +442,25 @@ async function createWindow(windows, create) {
 }
 
 /**
+ * Make a plan's tab groups again from its new tabs.
+ *
+ * @param {Pick<WorkspaceApis, 'tabs' | 'tabGroups'>} apis - `chrome.tabs` and `chrome.tabGroups`.
+ * @param {WindowPlan} plan - The window's plan.
+ * @param {readonly (number | undefined)[]} ids - Each tab's id, by its index in the plan;
+ *   undefined for one Chrome refused.
+ * @param {number} windowId - The window the tabs are in.
+ * @returns {Promise<void>}
+ */
+async function makeGroups({ tabs, tabGroups }, plan, ids, windowId) {
+  for (const group of plan.groups) {
+    const members = group.tabs.flatMap((index) => ids[index] ?? []);
+    if (!members.length) continue;
+    const groupId = await tabs.group({ tabIds: /** @type {[number, ...number[]]} */ (members), createProperties: { windowId } });
+    await tabGroups.update(groupId, { title: group.title, color: group.color, collapsed: group.collapsed });
+  }
+}
+
+/**
  * Reopen one window of a workspace.
  *
  * @param {Pick<WorkspaceApis, 'tabs' | 'windows' | 'tabGroups' | 'session'>} apis - The chrome APIs.
@@ -461,16 +487,37 @@ async function openWindow({ tabs, windows, tabGroups, session }, plan) {
   }
 
   // Groups first: unloading gives a tab a new id, and it keeps its group.
-  for (const group of plan.groups) {
-    const members = group.tabs.flatMap((index) => ids[index] ?? []);
-    if (!members.length) continue;
-    const groupId = await tabs.group({ tabIds: /** @type {[number, ...number[]]} */ (members), createProperties: { windowId } });
-    await tabGroups.update(groupId, { title: group.title, color: group.color, collapsed: group.collapsed });
-  }
+  await makeGroups({ tabs, tabGroups }, plan, ids, windowId);
   const others = ids.flatMap((id, index) => (id === undefined || index === plan.active ? [] : [id]));
   const tabIds = [first, ...await unloadWhenAnswered({ tabs, session }, others)];
   if (plan.state !== 'normal') await setWindowState(windows, windowId, plan.state).catch(() => {});
   return { windowId, tabIds };
+}
+
+/**
+ * Open every tab of some saved windows at the end of an open window's tab strip ("Open in this
+ * window"): in order, pinned ones among the window's pinned tabs, each saved window's groups made
+ * again (when asked). None comes to the front, so all are unloaded as their sites answer. A tab
+ * Chrome refuses is left out.
+ *
+ * @param {Pick<WorkspaceApis, 'tabs' | 'tabGroups' | 'session'>} apis - The chrome APIs.
+ * @param {readonly WindowPlan[]} plans - The saved windows' plans.
+ * @param {number} windowId - The window to open them in.
+ * @returns {Promise<number[]>} The ids of the tabs opened.
+ */
+async function openInWindow({ tabs, tabGroups, session }, plans, windowId) {
+  /** @type {number[]} */
+  const opened = [];
+  for (const plan of plans) {
+    /** @type {(number | undefined)[]} */
+    const ids = [];
+    for (const { url, pinned } of plan.tabs) {
+      ids.push((await tabs.create({ windowId, url, pinned, active: false }).catch(() => undefined))?.id);
+    }
+    await makeGroups({ tabs, tabGroups }, plan, ids, windowId);
+    opened.push(...ids.flatMap((id) => id ?? []));
+  }
+  return unloadWhenAnswered({ tabs, session }, opened);
 }
 
 /**
@@ -481,12 +528,14 @@ async function openWindow({ tabs, windows, tabGroups, session }, plan) {
  * closed while its tabs are still being added).
  *
  * @param {WorkspaceApis} apis - `chrome.tabs`, `chrome.windows`, `chrome.tabGroups` and `chrome.storage.session`.
- * @param {Workspace} workspace - The workspace.
- * @param {{reopenGroups: boolean}} options - Whether to make its tab groups again (Chrome adds
- *   each group it makes to its saved tab groups).
+ * @param {Pick<Workspace, 'windows'>} workspace - The workspace (or a snapshot: its windows).
+ * @param {{reopenGroups: boolean, windowId?: number}} options - Whether to make its tab groups
+ *   again (Chrome adds each group it makes to its saved tab groups), and, for "Open in this
+ *   window", the open window that takes all its tabs instead of new windows.
  * @returns {Promise<number[]>} The ids of the tabs opened.
  */
 export async function openWorkspace(apis, workspace, options) {
+  if (options.windowId !== undefined) return openInWindow(apis, reopenPlan(workspace, options), options.windowId);
   /** @type {number[]} */
   const opened = [];
   /** @type {number | undefined} */
@@ -505,15 +554,42 @@ export async function openWorkspace(apis, workspace, options) {
 }
 
 /**
+ * A list kept in `chrome.storage.local` under one key (the workspaces, the snapshots).
+ *
+ * @template T
+ * @param {StorageArea} local - `chrome.storage.local`.
+ * @param {string} key - The item's name.
+ * @returns {Promise<T[]>} The list; [] when there's none.
+ */
+export async function loadList(local, key) {
+  const { [key]: list } = await local.get([key]);
+  return Array.isArray(list) ? list : [];
+}
+
+/**
+ * Change such a list: `change` gets the stored list and returns the new one, which is stored
+ * most recently saved first.
+ *
+ * @template {{savedAt: number}} T
+ * @param {StorageArea} local - `chrome.storage.local`.
+ * @param {string} key - The item's name.
+ * @param {(list: T[]) => T[]} change - The change.
+ * @returns {Promise<T[]>} The list as stored.
+ * @throws {Error} When Chrome refuses the write (the storage is full); nothing is changed then.
+ */
+export async function updateList(local, key, change) {
+  const list = change(await loadList(local, key)).toSorted((a, b) => b.savedAt - a.savedAt);
+  await local.set({ [key]: list });
+  return list;
+}
+
+/**
  * The saved workspaces.
  *
  * @param {StorageArea} local - `chrome.storage.local`.
  * @returns {Promise<Workspace[]>} Most recently saved first; [] when there are none.
  */
-export async function loadWorkspaces(local) {
-  const { [WORKSPACES_KEY]: list } = await local.get([WORKSPACES_KEY]);
-  return Array.isArray(list) ? list : [];
-}
+export const loadWorkspaces = (local) => loadList(local, WORKSPACES_KEY);
 
 /**
  * Change the saved workspaces: `change` gets the stored list and returns the new one, which is
@@ -525,10 +601,24 @@ export async function loadWorkspaces(local) {
  * @example
  * await updateWorkspaces(chrome.storage.local, (list) => list.filter((w) => w.id !== id)); // delete one
  */
-export async function updateWorkspaces(local, change) {
-  const list = change(await loadWorkspaces(local)).toSorted((a, b) => b.savedAt - a.savedAt);
-  await local.set({ [WORKSPACES_KEY]: list });
-  return list;
+export const updateWorkspaces = (local, change) => updateList(local, WORKSPACES_KEY, change);
+
+/**
+ * What matters about some saved windows when asking whether anything has changed: the windows,
+ * each one's tabs in order (address, pinned, group) and its groups (title and colour). Not
+ * titles, which tab is in front, or where the windows are: a page counting unread messages in
+ * its title hasn't changed anything worth keeping.
+ *
+ * @param {readonly WorkspaceWindow[]} windows - The saved windows.
+ * @returns {string} The same text for the same layout.
+ * @example
+ * layoutKey(before) === layoutKey(after); // nothing was opened, closed, moved, pinned or grouped
+ */
+export function layoutKey(windows) {
+  return JSON.stringify(windows.map((win) => [
+    win.tabs.map((tab) => [tab.url, Boolean(tab.pinned), tab.group ?? -1]),
+    win.groups.map((group) => [group.title, group.color]),
+  ]));
 }
 
 /**

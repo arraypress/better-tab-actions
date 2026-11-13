@@ -1,7 +1,8 @@
 /**
  * What the service worker does, wired to `chrome` by {@link startWorker}: builds the tab
  * right-click menu (menu.js) and keeps its live labels up to date, runs the actions from the menu
- * and keyboard shortcuts, closes unused tabs automatically when that's on (auto-close.js), and
+ * and keyboard shortcuts, closes unused tabs automatically and takes snapshots when those are on
+ * (auto-close.js, auto-snapshot.js), and
  * tracks the recently used tabs for "Switch to last used tab" (recent.js).
  *
  * Nothing that matters is kept in the worker's memory, which Chrome drops after 30 idle seconds:
@@ -18,7 +19,9 @@ import { settingsStore } from '../shared/settings.js';
 import { CLOSED_KEY, closedCount } from '../shared/undo.js';
 import { wordsOf } from '../shared/text.js';
 import { loadWorkspaces, unloadIfAnswered, WORKSPACES_KEY } from '../shared/workspaces.js';
+import { takeSnapshot } from '../shared/snapshots.js';
 import { AUTO_CLOSE_ALARM, closeUnusedTabs, scheduleAutoClose } from './auto-close.js';
+import { scheduleSnapshots, SNAPSHOT_ALARM } from './auto-snapshot.js';
 import { createMenuKeeper, menuItems } from './menu.js';
 import { forget, lastUsed, loadRecent, noteUsed, RECENT_KEY } from './recent.js';
 
@@ -93,10 +96,13 @@ export function startWorker(api) {
     return runAction(id, tab, browser, { settings, extensionId: api.runtime.id, workspaceId });
   }
 
-  /** Start or stop the automatic-closing alarm to match the settings. */
+  /** Start or stop the automatic-closing and snapshot alarms to match the settings. */
   async function schedule() {
-    await scheduleAutoClose({ alarms: api.alarms, local: api.storage.local }, await settingsStore.load(api.storage), Date.now())
+    const settings = await settingsStore.load(api.storage);
+    await scheduleAutoClose({ alarms: api.alarms, local: api.storage.local }, settings, Date.now())
       .catch(logFailure('Scheduling automatic closing'));
+    await scheduleSnapshots({ ...browser, alarms: api.alarms }, settings, Date.now())
+      .catch(logFailure('Scheduling snapshots'));
   }
 
   /**
@@ -123,10 +129,12 @@ export function startWorker(api) {
   });
 
   // "Close unused tabs automatically": each check closes what has gone unused (auto-close.js).
+  // "Take snapshots automatically": each alarm keeps a snapshot if the windows have changed.
   api.alarms.onAlarm.addListener(async ({ name }) => {
-    if (name !== AUTO_CLOSE_ALARM) return;
+    if (name !== AUTO_CLOSE_ALARM && name !== SNAPSHOT_ALARM) return;
     const settings = await settingsStore.load(api.storage);
-    await closeUnusedTabs(browser, settings, Date.now()).catch(logFailure('Closing unused tabs'));
+    if (name === AUTO_CLOSE_ALARM) await closeUnusedTabs(browser, settings, Date.now()).catch(logFailure('Closing unused tabs'));
+    else if (settings.autoSnapshot) await takeSnapshot(browser, { auto: true, now: Date.now() }).catch(logFailure('Taking a snapshot'));
   });
 
   // Keep "Mute other tabs" / "Unmute tabs" in step with what's actually muted, and the group items

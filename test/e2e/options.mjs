@@ -96,7 +96,7 @@ await runChecks(runner, async () => {
     const page = await open();
     assert.equal(await page.title(), 'Better Tab Actions settings');
     assert.equal(await page.locator('h1').innerText(), 'Better Tab Actions');
-    assert.deepEqual(await page.locator('h2').allInnerTexts(), ['Menu', 'Workspaces', 'Closing tabs', 'Keyboard shortcuts', 'About Better Tab Actions']);
+    assert.deepEqual(await page.locator('h2').allInnerTexts(), ['Menu', 'Workspaces', 'Snapshots', 'Closing tabs', 'Keyboard shortcuts', 'About Better Tab Actions']);
     assert.equal(await page.locator('#menu-intro').innerText(), 'Choose what appears under More tab actions when you right-click a tab. Hidden actions still work from keyboard shortcuts.');
     assert.deepEqual(await page.locator('#menu-intro strong').allInnerTexts(), ['More tab actions']);
     assert.equal(await page.locator('#no-workspaces-text').innerText(), 'Workspaces you save appear here. To save your windows, right-click a tab and choose More tab actions › Save windows as workspace.');

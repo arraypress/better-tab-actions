@@ -24,6 +24,14 @@ kept by Chrome itself, in your saved tab groups, like the groups you make yourse
   a bookmark.
   They are kept on this computer only, in Chrome’s local extension storage: never synced, never
   sent anywhere. Delete one on the settings page, or remove the extension, and it’s gone.
+  “Export” writes them to a file on your computer, only when you click it; the file holds those
+  addresses and titles, so share it with care. “Import” reads only the file you choose.
+- **Snapshots**, when you take one or turn on “Take snapshots automatically” (off unless you do):
+  the same things as a workspace, for every ordinary window, with the time. Incognito windows
+  are never in one. Automatic ones are taken only when your tabs have changed, and only the
+  newest 20 are kept (fewer if they’re large); ones you take yourself stay until you delete
+  them. Kept on this computer only, never synced, never sent anywhere. Turning the setting off
+  stops new ones; delete any on the settings page.
 - **The last tabs it closed**, on this computer only, so “Reopen closed tabs” can bring them back
   (with automatic closing on, the tabs it closed by itself are added to them). Incognito tabs are
   never among them.
@@ -35,8 +43,8 @@ kept by Chrome itself, in your saved tab groups, like the groups you make yourse
 - **Whether Chrome is in light or dark mode**, on this computer only, to draw its toolbar icon in
   the right colour.
 
-The closed tabs and recent tabs lists are cleared when Chrome quits; workspaces stay until you
-delete them.
+The closed tabs and recent tabs lists are cleared when Chrome quits; workspaces and snapshots stay
+until you delete them (the oldest automatic snapshots make way for new ones).
 
 ## What it sends
 

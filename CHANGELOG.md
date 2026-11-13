@@ -19,6 +19,21 @@ First version.
   synced; up to 40 workspaces of up to 500 tabs. **Reopen tab groups** setting, as Chrome saves
   every group it reopens. A window saved on a display that’s since been unplugged opens where
   Chrome puts new windows. Commands for save windows, save this window and open the last workspace.
+- **Open in this window**: a workspace or snapshot’s tabs open at the end of the window you’re in
+  (several saved windows become tabs of this one, groups kept), beside opening in new windows.
+- **Export and import workspaces** on the settings page: one versioned JSON file, downloaded
+  through a link (no permission). Importing says what it will add first (“2 new workspaces, 1
+  already here, 3 tabs that can’t be reopened”), merges and never replaces, skips workspaces
+  already kept (the same file twice adds nothing), leaves out and counts tabs that can’t be
+  reopened, drops passwords from addresses, and refuses a file that isn’t ours or is from a newer
+  version.
+- **Snapshots**: “Take snapshot” keeps every window as a workspace would (groups, window state
+  and size); “Take snapshots automatically” (off by default) keeps one every 5, 15, 30 or 60
+  minutes, only when tabs were opened, closed, moved, pinned or grouped (not for a new title or
+  another tab in front). Automatic ones keep to the newest 20 and 1 MB, the oldest dropped
+  first; the ones you take (up to 10) are never pushed out by them. A snapshot that can’t be
+  kept is said so on the settings page. Each can be opened, saved as a workspace or deleted
+  (with Undo). Never incognito windows; on this computer only.
 - **Close unused tabs automatically** (off by default): tabs not used for 1, 4 or 12 hours, 1 or 3
   days, or 1 week are closed every few minutes (`chrome.alarms`, no install warning) and join
   “Reopen closed tabs”. Only time Chrome is open and the computer awake counts, from when it’s

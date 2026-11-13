@@ -57,3 +57,27 @@ export function duration(hours, words) {
   if (hours % 24 === 0) return counted(hours / 24, 'durationDaysOne', 'durationDays', words);
   return counted(hours, 'durationHoursOne', 'durationHours', words);
 }
+
+/**
+ * A number of minutes, in hours once it's whole hours.
+ *
+ * @param {number} minutes - How many minutes.
+ * @param {Words} words - The extension's words.
+ * @returns {string} "5 minutes", "1 hour".
+ * @example
+ * minutesText(60, words); // '1 hour'
+ */
+export function minutesText(minutes, words) {
+  return minutes % 60 === 0 ? duration(minutes / 60, words) : counted(minutes, 'durationMinutesOne', 'durationMinutes', words);
+}
+
+/**
+ * A date with its time of day, as the person's language writes them: what a snapshot is known by.
+ *
+ * @param {number} time - The moment, in ms since the epoch.
+ * @param {string} [locale] - The browser's own when left out.
+ * @returns {string} "13 Nov 2026, 21:54" (en-GB), "Nov 13, 2026, 9:54 PM" (en-US).
+ */
+export function dateTime(time, locale) {
+  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(time);
+}
