@@ -16,11 +16,11 @@
 import assert from 'node:assert/strict';
 import { checkRunner, runChecks, stopWorker, until } from '@arraypress/extension-kit/testing';
 import { ACTIONS, SWITCH_LAST } from '../../extension/shared/actions.js';
-import { click, openWindow, press, serveExampleSites, testProfile } from './helpers.mjs';
+import { click, openWindow, press, testProfile } from './helpers.mjs';
 
 const profile = await testProfile('bta-worker-');
 const launched = await profile.launch();
-const { context, worker, close } = launched;
+const { worker, close } = launched;
 const runner = checkRunner();
 const { check } = runner;
 
@@ -41,7 +41,6 @@ const strip = (windowId) => worker.evaluate(async (windowId) => (await chrome.ta
 const inMenu = (id) => worker.evaluate((id) => chrome.contextMenus.update(id, {}).then(() => true, () => false), id);
 
 await runChecks(runner, async () => {
-  await serveExampleSites(context);
   const urls = ['https://a.example/1', 'https://b.example/', 'https://a.example/2', 'https://c.example/'];
   const { windowId, tabIds } = await openWindow(worker, urls);
 

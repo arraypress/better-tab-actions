@@ -9,10 +9,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { menuEntries, menuState, MANAGE_WORKSPACES, WORKSPACE_ITEM_PREFIX } from '../extension/shared/actions.js';
 import { DEFAULTS, normalizeSettings } from '../extension/shared/settings.js';
-import { MAX_URL } from '../extension/shared/sites.js';
+import { MAX_URL, withoutCredentials } from '../extension/shared/sites.js';
 import {
   loadWorkspaces, MAX_BYTES, MAX_TABS, MAX_TITLE, MAX_WORKSPACES, MENU_WORKSPACES, reopenable, reopenPlan,
-  replaceWorkspace, snapshotWindows, updateWorkspaces, workspaceName, workspaceSummary,
+  replaceWorkspace, snapshotWindows, unloadIfAnswered, UNLOAD_PREFIX, updateWorkspaces, workspaceName, workspaceSummary,
 } from '../extension/shared/workspaces.js';
 import { EXTENSION_ID, fakeBrowser, runOn, SCREEN } from './fake-browser.js';
 import { errorsLogged, WORDS } from './helpers.js';
@@ -137,6 +137,27 @@ test('snapshotWindows: skips and counts tabs that can’t be reopened; drops the
   ]);
   assert.deepEqual(windows[0].groups, [{ title: 'Kept', color: 'green', collapsed: false }]);
   assert.equal(windows[0].active, 0, 'a skipped active tab passes the part to the tab before it');
+});
+
+test('a password in an address isn’t kept: the workspace stores, and reopens, the address without it', async () => {
+  assert.equal(withoutCredentials('https://me:secret@example.com/inbox?x=1#top'), 'https://example.com/inbox?x=1#top');
+  assert.equal(withoutCredentials('http://me@example.com:8080/'), 'http://example.com:8080/');
+  assert.equal(withoutCredentials('view-source:https://me:secret@example.com/'), 'view-source:https://example.com/');
+  for (const same of ['https://example.com/@me', 'https://example.com/?mail=a@b.com', 'mailto:me@example.com', 'not a url @', '']) {
+    assert.equal(withoutCredentials(same), same);
+  }
+
+  const b = fakeBrowser([
+    { id: 1, url: 'https://a.com/', active: true },
+    { id: 2, url: 'https://me:secret@intranet.com/wiki' },
+    { id: 3, url: '', pendingUrl: 'https://me:secret@loading.com/' },
+  ]);
+  await run(b, 'save-window-workspace', 1);
+  const stored = JSON.stringify(await b.local.get(null));
+  assert.ok(!stored.includes('secret') && !stored.includes('me@'), stored);
+  await b.windows.remove(1);
+  await run(b, 'open-workspace', null);
+  assert.deepEqual(Object.values(b.layout()), [['https://a.com/', 'https://intranet.com/wiki', 'https://loading.com/']]);
 });
 
 test('snapshotWindows: at most MAX_TABS tabs and MAX_BYTES; titles cut to MAX_TITLE', () => {
@@ -276,6 +297,42 @@ test('open-workspace: new windows with the same tabs, order, pinned tab, group, 
   assert.deepEqual(b.window(w1), { state: 'normal', type: 'normal', focused: true, left: 5, top: 6, width: 1000, height: 700 });
   assert.equal(b.window(w2)?.state, 'maximized');
   assert.equal(b.window(w2)?.focused, false);
+});
+
+test('open-workspace: a tab whose site hasn’t answered is never discarded (it would lose its address); it’s unloaded when the site answers, unless it’s in front by then', async () => {
+  const b = fakeBrowser([
+    { id: 1, url: 'https://a.com/', active: true },
+    { id: 2, url: 'https://slow.com/1' },
+    { id: 3, url: 'https://b.com/' },
+    { id: 4, url: 'https://slower.com/' },
+  ], { slow: ['slow.com', 'slower.com'] });
+  await run(b, 'save-window-workspace', 1);
+  await b.windows.remove(1);
+
+  const started = Date.now();
+  const opened = await run(b, 'open-workspace', null);
+  assert.ok(Date.now() - started < 1000, 'opening doesn’t wait for slow sites');
+  const [win] = b.windowIds;
+  assert.deepEqual(b.described(win), ['https://a.com/', '(waiting for https://slow.com/1)', 'https://b.com/ discarded', '(waiting for https://slower.com/)']);
+  const marked = () => b.session.get(null).then((all) => Object.keys(all).filter((key) => key.startsWith(UNLOAD_PREFIX)).length);
+  assert.equal(await marked(), 2, 'the two waiting tabs are marked in chrome.storage.session');
+
+  // What the service worker does when a tab reports its address, however much later.
+  const [slow] = b.answer('slow.com');
+  assert.notEqual(await unloadIfAnswered(b, slow.id), slow.id, 'discarded: it has a new id');
+  assert.equal(b.described(win)[1], 'https://slow.com/1 discarded');
+
+  // The user clicks the other one while it’s still waiting: it’s theirs now, and stays loaded.
+  await b.tabs.update(opened[3], { active: true });
+  const [slower] = b.answer('slower.com');
+  assert.equal(await unloadIfAnswered(b, slower.id), slower.id);
+  assert.equal(b.described(win)[3], 'https://slower.com/');
+  assert.equal(await marked(), 0);
+
+  // A tab nobody marked is never unloaded, whatever it reports.
+  const other = await b.tabs.create({ windowId: win, url: 'https://c.com/' });
+  assert.equal(await unloadIfAnswered(b, other.id), other.id);
+  assert.equal(b.tab(other.id)?.discarded, false);
 });
 
 test('open-workspace: a window saved on a screen that’s gone opens where Chrome puts it, at its size (fitted to this screen)', async () => {

@@ -52,6 +52,35 @@ export function tabUrl(tab) {
   return tab.url || tab.pendingUrl || '';
 }
 
+/** What the address of a page's source starts with; the page's own address follows. */
+const VIEW_SOURCE = 'view-source:';
+
+/**
+ * An address without its `user:password@` part, so a password typed into an address isn't kept
+ * where addresses are stored. Addresses with none, and ones that aren't URLs, come back unchanged.
+ *
+ * @param {string} url - A tab's address.
+ * @returns {string} The address without credentials.
+ * @example
+ * withoutCredentials('https://me:secret@example.com/inbox'); // 'https://example.com/inbox'
+ * withoutCredentials('https://example.com/@me'); // unchanged
+ * withoutCredentials('view-source:https://me:secret@example.com/'); // 'view-source:https://example.com/'
+ */
+export function withoutCredentials(url) {
+  if (!url.includes('@')) return url;
+  if (url.startsWith(VIEW_SOURCE)) return `${VIEW_SOURCE}${withoutCredentials(url.slice(VIEW_SOURCE.length))}`;
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return url;
+  }
+  if (!parsed.username && !parsed.password) return url;
+  parsed.username = '';
+  parsed.password = '';
+  return parsed.href;
+}
+
 /**
  * Key for spotting duplicate tabs: the full URL minus any #fragment.
  *

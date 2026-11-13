@@ -14,7 +14,7 @@ Right-click any tab → **More tab actions**:
 |---|---|
 | Close tabs from this site | Closes every tab on the same site as the one you clicked |
 | Close other tabs from this site | The same, but keeps the tab you clicked |
-| Close duplicate tabs | Keeps one tab per page |
+| Close duplicate tabs | Keeps one tab per page, and the tab in front in any other window |
 | Close tabs not used in 7 days | The number of days is a setting |
 | Close tabs to the left | Chrome has “to the right”; this is the other side |
 | Reopen closed tabs | Brings back the last batch it closed, in their places and groups |
@@ -23,7 +23,7 @@ Right-click any tab → **More tab actions**:
 | Save this window as a group | Puts the window’s loose tabs into one saved tab group |
 | Close window and keep as group | The same, then closes the window |
 | Save windows as workspace | Saves your windows with their tabs, pinned tabs, groups and sizes |
-| Open workspace › | Reopens a saved workspace; tabs load when you click them |
+| Open workspace › | Reopens a saved workspace; only the tab in front of each window stays loaded |
 
 - **Close unused tabs automatically** (off until you turn it on): closes tabs you haven’t used for
   the time you pick, counting only time Chrome is open and your computer is awake, from when you
@@ -42,6 +42,10 @@ Right-click any tab → **More tab actions**:
   tabs for incognito windows.
 - Chrome doesn’t tell extensions which tabs are using your camera or microphone, so add a call’s
   site to the “never close” list.
+- Chrome can’t open a tab without asking its site for the page, so each tab of a reopened
+  workspace does that once; all but the tab in front are then unloaded as soon as their sites
+  answer, and load in full when you click them.
+- A password written in an address (`https://name:password@site/`) is never saved in a workspace.
 - Settings sync through Chrome Sync; workspaces stay on this computer.
 
 ## Privacy

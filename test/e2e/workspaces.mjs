@@ -6,8 +6,10 @@
  *
  * 1. Two windows, one with a pinned tab and a red, collapsed group, are saved, closed and
  *    reopened: same windows, tab order, pinned tab, group (title, colour, collapsed) and state.
- * 2. Only each window's active tab loads: the others are discarded before any request and load
- *    when clicked.
+ * 2. Only each window's active tab stays loaded: every tab asks its site for the page once (the
+ *    local server counts: Chrome can't open a tab unloaded), the others are unloaded as soon as
+ *    their sites answer, and load when clicked. A tab whose site is slow keeps its address while
+ *    it waits and is unloaded when the site answers, by a service worker started since.
  * 3. Chrome's saved tab groups (read from the closed profile, the kit's savedTabGroups): every group the
  *    extension reopens is saved again, pinned to the bar, so each reopen adds a copy; with
  *    "Reopen tab groups" off, none is added.
@@ -18,8 +20,8 @@
  * @module test/e2e/workspaces
  */
 import assert from 'node:assert/strict';
-import { checkRunner, runChecks, savedTabGroups, until } from '@arraypress/extension-kit/testing';
-import { click, openWindow, press, serveExampleSites, testProfile } from './helpers.mjs';
+import { checkRunner, runChecks, savedTabGroups, stopWorker, until } from '@arraypress/extension-kit/testing';
+import { click, openWindow, press, SLOW_MS, testProfile } from './helpers.mjs';
 
 /** @import { Worker } from 'playwright' */
 /** @import { Workspace } from '../../extension/shared/workspaces.js' */
@@ -39,7 +41,8 @@ let closeOpen;
 const stored = (worker) => worker.evaluate(async () => /** @type {Workspace[]} */ ((await chrome.storage.local.get('workspaces')).workspaces ?? []));
 
 /**
- * Every window but the one Chrome started with, as "url" strings with " pinned", " unloaded" and
+ * Every window but the one Chrome started with, as "url" strings ("(waiting for url)" while the
+ * tab's site hasn't answered) with " pinned", " unloaded" and
  * " [title colour collapsed]" when they apply, plus the window's state.
  *
  * @param {Worker} worker - The service worker.
@@ -53,7 +56,7 @@ const describeWindows = (worker, ignore) => worker.evaluate(async (ignore) => {
     state: win.state,
     tabs: (win.tabs ?? []).map((tab) => {
       const group = groups.get(tab.groupId);
-      return `${tab.url || tab.pendingUrl}${tab.pinned ? ' pinned' : ''}${tab.discarded ? ' unloaded' : ''}${
+      return `${tab.url || `(waiting for ${tab.pendingUrl})`}${tab.pinned ? ' pinned' : ''}${tab.discarded ? ' unloaded' : ''}${
         group ? ` [${group.title} ${group.color}${group.collapsed ? ' collapsed' : ''}]` : ''}`;
     }),
   }));
@@ -73,19 +76,20 @@ const GITHUB_B = 'https://github.example/b';
 const NEWS = 'https://news.example/';
 const DOCS_1 = 'https://docs.example/1';
 const DOCS_2 = 'https://docs.example/2';
+const SLOW = 'https://slow.example/page';
 
 await runChecks(runner, async () => {
   /** Start the browser on the profile, with the made-up sites answered. */
   const launch = async () => {
     const launched = await profile.launch();
     closeOpen = launched.close;
-    return { ...launched, hits: await serveExampleSites(launched.context) };
+    return launched;
   };
+  const { hits } = profile;
   /** @type {string} */
   let workspaceId = '';
-  const started = await launch();
-  const { hits } = started;
-  let { worker, close } = started;
+  const launched = await launch();
+  let { worker, close } = launched;
   /** @type {{windowId: number, tabIds: number[]}} */
   let first;
   /** @type {{windowId: number, tabIds: number[]}} */
@@ -112,12 +116,12 @@ await runChecks(runner, async () => {
     await until(() => worker.evaluate((id) => chrome.contextMenus.update(`open-workspace:${id}`, {}).then(() => true, () => false), workspaceId), 'the submenu item');
   });
 
-  await check('reopened from its shortcut: two windows, tab order, pinned tab, red collapsed “Reading” group, maximized window; only each window’s active tab loaded', async () => {
+  await check('reopened from its shortcut: two windows, tab order, pinned tab, red collapsed “Reading” group, maximized window; every tab asked its site once, and only each window’s active tab stayed loaded', async () => {
     await worker.evaluate((ids) => Promise.all(ids.map((id) => chrome.windows.remove(id))), [first.windowId, second.windowId]);
     hits.clear();
     const opened = await press(worker, 'open-workspace'); // The keyboard shortcut: the latest workspace.
     assert.equal(opened.length, 6);
-    await new Promise((r) => setTimeout(r, 1500)); // Time for any tab that was going to load.
+    await until(async () => (await describeWindows(worker, [])).flatMap((win) => win.tabs).filter((tab) => tab.endsWith(' unloaded') || tab.includes(' unloaded [')).length === 4, 'the four background tabs to be unloaded');
     assert.deepEqual(await describeWindows(worker, []), [
       {
         state: 'normal',
@@ -125,7 +129,8 @@ await runChecks(runner, async () => {
       },
       { state: 'maximized', tabs: [DOCS_1, `${DOCS_2} unloaded`] },
     ]);
-    assert.deepEqual([...hits.keys()].sort(), [DOCS_1, GITHUB_A], `only the active tabs asked for their pages: ${JSON.stringify([...hits])}`);
+    // Chrome has no way to open a tab unloaded: each one asks for its page, once.
+    assert.deepEqual([...hits].sort(), [DOCS_1, DOCS_2, GITHUB_A, GITHUB_B, MAIL, NEWS].sort().map((url) => [url, 1]));
   });
 
   await check('an unloaded tab loads when clicked', async () => {
@@ -134,7 +139,34 @@ await runChecks(runner, async () => {
       await chrome.windows.update(tab.windowId, { focused: true });
       await chrome.tabs.update(tab.id ?? -1, { active: true });
     }, DOCS_2);
-    await until(() => hits.get(DOCS_2), 'the clicked tab to load');
+    await until(() => hits.get(DOCS_2) === 2, 'the clicked tab to ask for its page again');
+    await until(async () => (await describeWindows(worker, []))[1].tabs.includes(DOCS_2), 'the clicked tab to be loaded');
+  });
+
+  await check(`a tab whose site takes ${SLOW_MS / 1000} s to answer keeps its address while it waits, and is unloaded when the site answers, by a worker started since`, async () => {
+    const all = await stored(worker);
+    const slow = { ...all[0], id: 'slow', windows: [{ ...all[0].windows[1], state: /** @type {const} */ ('normal'), tabs: [DOCS_1, SLOW, DOCS_2].map((url) => ({ url, title: '' })) }] };
+    await worker.evaluate((workspaces) => chrome.storage.local.set({ workspaces }), [slow]);
+    try {
+      const start = await windowIds(worker);
+      const [tabId] = await worker.evaluate(async () => (await chrome.tabs.query({})).flatMap((tab) => tab.id ?? []));
+      hits.clear();
+      const began = Date.now();
+      assert.equal((await click(worker, 'open-workspace:slow', tabId)).length, 3);
+      assert.ok(Date.now() - began < SLOW_MS, 'opening didn’t wait for the slow site');
+      assert.deepEqual((await describeWindows(worker, start)).map((win) => win.tabs), [[DOCS_1, `(waiting for ${SLOW})`, `${DOCS_2} unloaded`]]);
+      // Chrome stops the idle worker; the tab reporting its address starts it again.
+      await stopWorker(launched, { start: false });
+      await until(async () => {
+        const [running] = launched.context.serviceWorkers();
+        if (!running) return false;
+        worker = running;
+        return describeWindows(running, start).then((windows) => windows[0]?.tabs[1] === `${SLOW} unloaded`, () => false);
+      }, 'the slow tab to be unloaded', SLOW_MS + 10_000);
+      assert.deepEqual([...hits].sort(), [DOCS_1, DOCS_2, SLOW].sort().map((url) => [url, 1]));
+    } finally {
+      await worker.evaluate((workspaces) => chrome.storage.local.set({ workspaces }), all);
+    }
   });
 
   await check('Chromium saves every reopened group again (pinned to the bar): two “Reading” groups now', async () => {

@@ -12,7 +12,10 @@ First version.
   order, pinned tabs, tab groups with their colours and collapsed state, window size and state),
   and reopen it later from **Open workspace** in the tab menu or from the settings page, where each
   can be opened, renamed, replaced with the current windows or deleted (with Undo). Only each
-  window’s active tab loads; the others load when clicked. Kept on this computer only, never
+  window’s active tab stays loaded: Chrome can’t open a tab unloaded, so every tab asks its site
+  for the page once and the others are unloaded as soon as their sites answer (a slow site’s tab
+  when it does, however long that takes), then load when clicked. A password written in an address
+  (`name:password@`) is never stored. Kept on this computer only, never
   synced; up to 40 workspaces of up to 500 tabs. **Reopen tab groups** setting, as Chrome saves
   every group it reopens. A window saved on a display that’s since been unplugged opens where
   Chrome puts new windows. Commands for save windows, save this window and open the last workspace.
@@ -27,6 +30,8 @@ First version.
   can give a key at chrome://extensions/shortcuts; the settings page lists the keys you’ve set.
   (Alt+Shift+letter, the usual default, types a character on a Mac and switches the keyboard’s
   language on Windows.)
+- “Close duplicate tabs” across all windows never closes the tab in front in another window: it’s
+  kept, and its copies go.
 - Choose which actions show in the menu.
 - Incognito tabs an action closes aren’t kept for “Reopen closed tabs”, as Chrome keeps no closed
   tabs for incognito windows.

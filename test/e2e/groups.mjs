@@ -13,7 +13,7 @@
  */
 import assert from 'node:assert/strict';
 import { checkRunner, runChecks, savedTabGroups } from '@arraypress/extension-kit/testing';
-import { click as clickOn, openWindow as openIn, serveExampleSites, testProfile } from './helpers.mjs';
+import { click as clickOn, openWindow as openIn, testProfile } from './helpers.mjs';
 
 /**
  * The service worker's global scope, with the groups this check saw Chrome update.
@@ -22,13 +22,11 @@ import { click as clickOn, openWindow as openIn, serveExampleSites, testProfile 
  */
 
 const profile = await testProfile('bta-groups-');
-const { context, worker, close } = await profile.launch();
+const { worker, close } = await profile.launch();
 const runner = checkRunner();
 const { check } = runner;
 
 await runChecks(runner, async () => {
-  // Made-up sites, answered locally (the network edge).
-  await serveExampleSites(context);
   /** @param {string[]} urls @param {number[]} [pin] */
   const openWindow = (urls, pin) => openIn(worker, urls, pin);
   /** @param {string} id @param {number} tabId */

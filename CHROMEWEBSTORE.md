@@ -26,7 +26,7 @@ Right-click any tab and open More tab actions for the jobs Chrome’s own tab me
 CLOSE TABS
 • Close tabs from this site: every tab from the same site, in one click.
 • Close other tabs from this site: the same, but keeps the tab you clicked.
-• Close duplicate tabs: keeps one copy of each page.
+• Close duplicate tabs: keeps one copy of each page, and never closes the tab in front in another window.
 • Close tabs not used in 7 days: you choose the number of days. Tabs playing sound are left alone.
 • Close tabs to the left: the partner to Chrome’s “Close tabs to the right”.
 • Reopen closed tabs: brings back the last batch an action closed, in their windows, places and groups.
@@ -44,7 +44,7 @@ TAB GROUPS
 
 WORKSPACES
 • Save windows as workspace: keeps every window with its tabs in order, pinned tabs, tab groups (names, colours, collapsed) and size, named after its main sites. Or save just the window you’re in.
-• Open workspace: reopens one in new windows. Only each window’s front tab loads; the rest load when you click them, so a big workspace opens fast.
+• Open workspace: reopens one in new windows. Only each window’s front tab stays loaded; the rest are unloaded as soon as their sites answer and load when you click them, so a big workspace stays light.
 • Manage them on the settings page: open, rename, replace with your current windows, or delete (with Undo).
 Workspaces stay on your computer. They’re never synced or sent anywhere.
 

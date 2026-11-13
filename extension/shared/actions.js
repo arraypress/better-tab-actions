@@ -291,7 +291,9 @@ function sameSite(target, tabs, settings) {
 
 /**
  * For each page open more than once, every copy except one: the target if it's a copy, else a
- * pinned one, else the most recently used.
+ * pinned one, else one in front in another window, else the most recently used. With "All
+ * windows", a copy that's the active tab of another window is never closed (its window would
+ * change under it, or close): it's kept as well, and its other copies go.
  *
  * @param {Tab} target - The clicked tab.
  * @param {readonly Tab[]} tabs - Every open tab.
@@ -304,11 +306,14 @@ function duplicates(target, tabs, settings) {
   const result = [];
   for (const [key, copies] of byPage) {
     if (key === null || copies.length < 2) continue;
+    // The tab in front in another window is what someone left there to come back to: it stays.
+    const inFrontElsewhere = copies.filter((tab) => tab.active && tab.windowId !== target.windowId);
     const keep =
       copies.find((tab) => tab.id === target.id) ??
       copies.find((tab) => tab.pinned) ??
+      inFrontElsewhere[0] ??
       copies.reduce((a, b) => ((b.lastAccessed ?? 0) > (a.lastAccessed ?? 0) ? b : a));
-    result.push(...copies.filter((tab) => tab !== keep && closable(tab, settings)));
+    result.push(...copies.filter((tab) => tab !== keep && !inFrontElsewhere.includes(tab) && closable(tab, settings)));
   }
   return result;
 }

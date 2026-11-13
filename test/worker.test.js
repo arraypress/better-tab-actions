@@ -187,6 +187,29 @@ test('workspaces from the menu: saving lists it under “Open workspace”, its 
   assert.ok(Object.values(chrome.browser.layout()).flat().includes(`chrome-extension://${EXTENSION_ID}/${WORKSPACES_PAGE}`));
 });
 
+test('a reopened workspace’s slow tab is unloaded when its site answers, even by a worker started since', async () => {
+  const chrome = fakeChrome([
+    { id: 1, url: 'https://a.com/', active: true },
+    { id: 2, url: 'https://slow.com/page' },
+    { id: 3, url: 'https://b.com/' },
+  ], { windows: { 1: { focused: true } }, slow: ['slow.com'] });
+  const { handleCommand } = startWorker(chrome.api);
+  await chrome.runtime.onInstalled.fire();
+  await handleCommand('save-window-workspace', tabOf(chrome, 1));
+  await chrome.windows.remove(1);
+
+  await handleCommand('open-workspace');
+  const [win] = chrome.browser.windowIds;
+  assert.deepEqual(chrome.browser.described(win), ['https://a.com/', '(waiting for https://slow.com/page)', 'https://b.com/ discarded']);
+
+  // Chrome stops the idle worker; the site answers a minute later, which starts it again.
+  dropListeners();
+  startWorker(chrome.api);
+  await chrome.answer('slow.com');
+  await until(() => chrome.browser.described(win)[1].endsWith(' discarded'), 'the slow tab to be unloaded');
+  assert.deepEqual(chrome.browser.described(win), ['https://a.com/', 'https://slow.com/page discarded', 'https://b.com/ discarded']);
+});
+
 test('an action Chrome refuses is logged with what was clicked, not left as an uncaught rejection', async () => {
   const { chrome } = await installed();
   chrome.api.tabs.remove = async () => { throw new Error('Tabs cannot be edited right now (user may be dragging a tab).'); };

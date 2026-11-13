@@ -5,8 +5,8 @@
  * tracks the recently used tabs for "Switch to last used tab" (recent.js).
  *
  * Nothing that matters is kept in the worker's memory, which Chrome drops after 30 idle seconds:
- * the menu's items are Chrome's, the closed batch and the recent tabs are in
- * `chrome.storage.session`, the check for unused tabs is a `chrome.alarms` alarm. The queues here
+ * the menu's items are Chrome's, the closed batch, the recent tabs and the reopened tabs still
+ * to unload are in `chrome.storage.session`, the check for unused tabs is a `chrome.alarms` alarm. The queues here
  * only put work started in one run of the worker in order.
  *
  * @module background/worker
@@ -17,7 +17,7 @@ import {
 import { settingsStore } from '../shared/settings.js';
 import { CLOSED_KEY, closedCount } from '../shared/undo.js';
 import { wordsOf } from '../shared/text.js';
-import { loadWorkspaces, WORKSPACES_KEY } from '../shared/workspaces.js';
+import { loadWorkspaces, unloadIfAnswered, WORKSPACES_KEY } from '../shared/workspaces.js';
 import { AUTO_CLOSE_ALARM, closeUnusedTabs, scheduleAutoClose } from './auto-close.js';
 import { createMenuKeeper, menuItems } from './menu.js';
 import { forget, lastUsed, loadRecent, noteUsed, RECENT_KEY } from './recent.js';
@@ -133,6 +133,12 @@ export function startWorker(api) {
   // with what the focused window holds (tabs grouped, pinned, opened, closed or moved between windows).
   api.tabs.onUpdated.addListener((tabId, changeInfo) => {
     if (changeInfo.mutedInfo || 'groupId' in changeInfo || 'pinned' in changeInfo) menu.refresh();
+  });
+  // A reopened workspace's tabs are unloaded as their sites answer (workspaces.js): a tab reports
+  // its address then, however long that took, and whichever run of the worker hears it. Tabs
+  // that weren't marked are left alone.
+  api.tabs.onUpdated.addListener((tabId, changeInfo) => {
+    if (changeInfo.url) unloadIfAnswered(browser, tabId).catch(logFailure('Unloading a reopened tab'));
   });
   api.tabs.onRemoved.addListener(menu.refresh);
   api.tabs.onCreated.addListener(menu.refresh);

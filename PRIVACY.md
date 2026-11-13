@@ -19,6 +19,9 @@ kept by Chrome itself, in your saved tab groups, like the groups you make yourse
   the same settings, as it does for Chrome’s own settings.
 - **Your workspaces**, when you save one: each window’s tabs (addresses and titles), which were
   pinned, its tab groups (names and colours) and its size, so “Open workspace” can bring them back.
+  A password written in an address (`name:password@`) is left out. Opening a workspace opens its
+  tabs in Chrome, so each tab’s site gets Chrome’s usual request for the page, as when you open
+  a bookmark.
   They are kept on this computer only, in Chrome’s local extension storage: never synced, never
   sent anywhere. Delete one on the settings page, or remove the extension, and it’s gone.
 - **The last tabs it closed**, on this computer only, so “Reopen closed tabs” can bring them back

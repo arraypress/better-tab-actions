@@ -166,7 +166,7 @@ export function fakeAlarms(now = 0) {
 /**
  * A whole `chrome` for the service worker: the fake browser's tabs, windows, tab groups and
  * storage, firing the events Chrome fires when they change (a tab created, removed, activated,
- * muted, pinned or grouped; a window focused), plus the menu, alarms, commands, the toolbar
+ * muted, pinned or grouped, or reporting its address once its site answers; a window focused), plus the menu, alarms, commands, the toolbar
  * button, the runtime's install and start-up events, and the extension's real words (`_locales`).
  *
  * @param {TabSeed[]} tabs - The open tabs (see `fakeBrowser`).
@@ -261,6 +261,16 @@ export function fakeChrome(tabs, options) {
     alarms,
     tabs: tabsApi,
     windows: windowsApi,
+    /**
+     * A slow site answers (see `fakeBrowser`'s `slow`): each of its waiting tabs reports its
+     * address, as Chrome's `tabs.onUpdated` does.
+     *
+     * @param {string} site - The site.
+     * @returns {Promise<void>} Settles once every listener has.
+     */
+    async answer(site) {
+      for (const tab of browser.answer(site)) await events.onUpdated.fire(tab.id, { url: tab.url }, tab);
+    },
     commands: api.commands,
     action: api.action,
     runtime: api.runtime,

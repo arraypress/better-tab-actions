@@ -132,6 +132,31 @@ test('close-duplicate-tabs: by default ignores copies in other windows; "All win
   assert.deepEqual(await run(fakeBrowser(tabs), 'close-duplicate-tabs', 1, ALL_WINDOWS), [2]);
 });
 
+test('close-duplicate-tabs: with "All windows", never closes the tab in front in another window; its copies go', async () => {
+  const b = fakeBrowser([
+    { id: 1, url: 'https://z.com/', active: true },
+    { id: 2, url: 'https://a.com/', lastAccessed: NOW },
+    { id: 3, url: 'https://a.com/' },
+    { id: 4, url: 'https://a.com/', windowId: 2, active: true, lastAccessed: NOW - DAY },
+    { id: 5, url: 'https://b.com/', windowId: 2 },
+    { id: 6, url: 'https://b.com/', windowId: 3, active: true },
+    { id: 7, url: 'https://b.com/', windowId: 4, active: true },
+  ]);
+  // a.com: window 2's front tab is the one kept, not the most recent. b.com: both front tabs stay.
+  assert.deepEqual(await run(b, 'close-duplicate-tabs', 1, ALL_WINDOWS), [2, 3, 5]);
+  assert.deepEqual(b.layout(), { 1: ['https://z.com/'], 2: ['https://a.com/'], 3: ['https://b.com/'], 4: ['https://b.com/'] });
+
+  // The clicked copy is still the one kept in its own window, and the other window keeps its front tab.
+  const c = fakeBrowser([
+    { id: 1, url: 'https://a.com/', active: true },
+    { id: 2, url: 'https://a.com/' },
+    { id: 3, url: 'https://a.com/', windowId: 2, active: true },
+    { id: 4, url: 'https://a.com/', windowId: 2 },
+  ]);
+  assert.deepEqual(await run(c, 'close-duplicate-tabs', 1, ALL_WINDOWS), [2, 4]);
+  assert.deepEqual(c.open, [1, 3]);
+});
+
 test('close-duplicate-tabs: prefers keeping a pinned copy and never closes pinned', async () => {
   const b = fakeBrowser([
     { id: 1, url: 'https://a.com/', lastAccessed: NOW },

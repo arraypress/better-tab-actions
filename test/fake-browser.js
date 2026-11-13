@@ -2,8 +2,9 @@
  * In-memory stand-in for the browser edge: chrome.tabs, chrome.windows, chrome.tabGroups,
  * chrome.extension's file access and chrome.storage (@arraypress/extension-kit's fake storage).
  * Holds real state (window membership, focus, state and bounds, tab order, active, pinned and
- * discarded tabs, groups, saved groups, mute) and refuses what Chromium refuses (addresses
- * extensions can't open, windows mostly off the screen), so tests check outcomes, not calls. Also
+ * discarded tabs, groups, saved groups, mute, and which sites have answered) and refuses what
+ * Chromium refuses (addresses extensions can't open, windows mostly off the screen), so tests
+ * check outcomes, not calls. Also
  * `runOn`, which runs an action against it as the background does. test/fake-chrome.js adds the
  * events and the rest of `chrome` around it, for the service worker.
  *
@@ -107,9 +108,14 @@ export const tabsAt = (...urls) => urls.map((url, i) => ({ id: i + 1, url }));
  * @param {Record<number, Partial<FakeWindow>>} [options.windows] - Windows' own state, by id;
  *   the rest are normal, unfocused windows with no bounds.
  * @param {boolean} [options.fileAccess] - Whether the user lets the extension open file:// pages. Default false.
+ * @param {string[]} [options.slow] - Sites ("slow.com") that don't answer until `answer(site)` is
+ *   called: a new tab there has only a `pendingUrl` until then, as in Chromium, where a tab
+ *   reports its `url` once its site's answer starts to arrive. Every other site answers at once.
  * @returns The APIs `runAction` takes, plus getters for what tests check.
  */
-export function fakeBrowser(initialTabs, { focusedWindowId = 1, windows: windowSeeds = {}, fileAccess = false } = {}) {
+export function fakeBrowser(initialTabs, { focusedWindowId = 1, windows: windowSeeds = {}, fileAccess = false, slow = [] } = {}) {
+  /** The sites that haven't answered yet. */
+  const waiting = new Set(slow);
   /** The window Chrome treats as last focused; follows `windows.update({focused})` and new windows. */
   let lastFocused = focusedWindowId;
   let nextTabId = 1000;
@@ -149,6 +155,22 @@ export function fakeBrowser(initialTabs, { focusedWindowId = 1, windows: windowS
     if (url && /^chrome:\/\/(kill|crash|hang|quit|restart)\b/.test(url)) return 'I\'m sorry. I\'m afraid I can\'t do that.';
     if (url?.startsWith('file:') && !fileAccess) return 'Cannot navigate to a file URL without local file access.';
     return undefined;
+  };
+
+  /**
+   * A new tab going to `url`: with its address at once, or only a `pendingUrl` while its site
+   * hasn't answered.
+   *
+   * @param {Omit<TabSeed, 'url'>} seed - Its id and the rest.
+   * @param {string | undefined} url - Where it's going.
+   * @returns {FakeTab} The tab.
+   */
+  const newTab = (seed, url) => {
+    let host = '';
+    try {
+      host = new URL(url ?? '').hostname;
+    } catch { /* Not a URL: it "answers" at once. */ }
+    return fakeTab(waiting.has(host) ? { ...seed, pendingUrl: url, status: 'loading' } : { ...seed, url });
   };
 
   /** @type {Map<number, FakeGroup>} Open groups the extension made, by id. */
@@ -229,7 +251,7 @@ export function fakeBrowser(initialTabs, { focusedWindowId = 1, windows: windowS
       if (windowId === undefined || !openWindows.has(windowId)) throw new Error(`No window with id: ${windowId}.`);
       const refused = refusal(url);
       if (refused) throw new Error(refused);
-      const tab = fakeTab({ id: nextTabId++, windowId, url, pinned });
+      const tab = newTab({ id: nextTabId++, windowId, pinned }, url);
       const inWindow = tabs.filter((t) => t.windowId === windowId);
       const pinnedCount = inWindow.filter((t) => t.pinned).length;
       const wanted = typeof index === 'number' ? index : inWindow.length;
@@ -246,15 +268,17 @@ export function fakeBrowser(initialTabs, { focusedWindowId = 1, windows: windowS
       return tab;
     },
     /**
-     * As Chrome 150+ does: the tab keeps its place, address and group but gets a new id. The
-     * active tab can't be discarded.
+     * As Chrome 150+ does: the tab keeps its place, address, pin and group but gets a new id. The
+     * active tab can't be discarded. A tab whose site hasn't answered loses its address for good
+     * (it has only a `pendingUrl`, which goes: the tab stays blank; checked in Chromium 156).
      *
      * @param {number} id - The tab.
      */
     async discard(id) {
       const tab = tabById(id);
       if (tab.active) throw new Error(`Cannot discard tab with id: ${id}.`);
-      Object.assign(tab, { id: nextTabId++, discarded: true });
+      Object.assign(tab, { id: nextTabId++, discarded: true, status: 'unloaded' });
+      delete tab.pendingUrl;
       return { ...tab };
     },
     /**
@@ -424,7 +448,7 @@ export function fakeBrowser(initialTabs, { focusedWindowId = 1, windows: windowS
         lastFocused = id;
       }
       openWindows.set(id, fakeWindow({ state, focused, ...Object.fromEntries(Object.entries(bounds).filter(([, v]) => v !== undefined)) }));
-      const created = [url ?? 'chrome://newtab/'].flat().map((u, i) => fakeTab({ id: nextTabId++, windowId: id, url: u, active: i === 0 }));
+      const created = [url ?? 'chrome://newtab/'].flat().map((u, i) => newTab({ id: nextTabId++, windowId: id, active: i === 0 }, u));
       tabs.push(...created);
       return { id, tabs: created.map((t) => ({ ...t })) };
     },
@@ -440,6 +464,23 @@ export function fakeBrowser(initialTabs, { focusedWindowId = 1, windows: windowS
     extension: { isAllowedFileSchemeAccess: async () => fileAccess },
     /** The whole `chrome.storage` (sync and `onChanged` too), for the service worker. */
     storage,
+    /**
+     * A slow site answers: its tabs that were waiting (and not discarded meanwhile) report their
+     * address, and new tabs there get theirs at once.
+     *
+     * @param {string} site - One of `options.slow`.
+     * @returns {FakeTab[]} The tabs that now have their address, as Chrome reports them.
+     */
+    answer(site) {
+      waiting.delete(site);
+      const answered = tabs.filter((t) => t.pendingUrl && new URL(t.pendingUrl).hostname === site);
+      for (const t of answered) {
+        t.url = t.pendingUrl;
+        t.status = 'complete';
+        delete t.pendingUrl;
+      }
+      return snapshot().filter((t) => answered.some((a) => a.id === t.id));
+    },
     /** Turn “Allow access to file URLs” on or off, as on chrome://extensions. */
     setFileAccess(/** @type {boolean} */ allowed) {
       fileAccess = allowed;
@@ -497,14 +538,15 @@ export function fakeBrowser(initialTabs, { focusedWindowId = 1, windows: windowS
       return [...groups.values()].map((g) => ({ title: g.title, color: g.color, collapsed: g.collapsed, windowId: g.windowId, urls: urlsIn(g.id) }));
     },
     /**
-     * A window's tabs as "url", with " pinned", " discarded" and " [group title]" when they apply.
+     * A window's tabs as "url", with " pinned", " discarded" and " [group title]" when they apply:
+     * "(waiting for …)" for a tab whose site hasn't answered, "(blank)" for one with no address.
      *
      * @param {number} windowId - The window.
      * @returns {string[]} The tabs, in order.
      */
     described: (windowId) => tabs
       .filter((t) => t.windowId === windowId)
-      .map((t) => `${t.url}${t.pinned ? ' pinned' : ''}${t.discarded ? ' discarded' : ''}${groups.has(t.groupId ?? -1) ? ` [${groups.get(t.groupId ?? -1)?.title}]` : ''}`),
+      .map((t) => `${t.url ?? (t.pendingUrl ? `(waiting for ${t.pendingUrl})` : '(blank)')}${t.pinned ? ' pinned' : ''}${t.discarded ? ' discarded' : ''}${groups.has(t.groupId ?? -1) ? ` [${groups.get(t.groupId ?? -1)?.title}]` : ''}`),
     /** Chrome's saved groups: { title, urls, open }. */
     get saved() {
       return saved.map((g) => ({ title: g.title, urls: g.groupId === null ? g.urls : urlsIn(g.groupId), open: g.groupId !== null }));

@@ -23,7 +23,7 @@ import { readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { checkRunner, runChecks, until, warningsAddedBy } from '@arraypress/extension-kit/testing';
 import { buildE2e } from '../../scripts/build-e2e.mjs';
-import { click, EXTENSION, openWindow, serveExampleSites, testProfile } from './helpers.mjs';
+import { click, EXTENSION, openWindow, testProfile } from './helpers.mjs';
 
 /** @import { Worker } from 'playwright' */
 /** @import { AwakeClock } from '../../extension/background/auto-close.js' */
@@ -55,8 +55,6 @@ const { check } = runner;
 const strip = (w, windowId) => w.evaluate(async (windowId) => (await chrome.tabs.query({ windowId })).map((tab) => tab.url || tab.pendingUrl || ''), windowId);
 
 await runChecks(runner, async () => {
-  await serveExampleSites(context);
-
   await check('alarms adds no install warning: Chrome lists “Read your browsing history” and “View and manage your tab groups” with and without it', async () => {
     const manifest = JSON.parse(await readFile(path.join(EXTENSION, 'manifest.json'), 'utf8'));
     const { warnings, without } = await warningsAddedBy(worker, manifest, ['alarms']);

@@ -7,14 +7,16 @@
  * computer, never synced. Sizes are bounded so they always fit local's 10 MB: at most
  * {@link MAX_WORKSPACES} workspaces of at most {@link MAX_TABS} tabs and {@link MAX_BYTES} each.
  *
- * Reopening makes new windows in which only each window's active tab loads: every other tab is
- * discarded as soon as its navigation starts, so it shows its address and loads when clicked
- * (checked in Chromium by test/e2e/workspaces.mjs). Loaded by the service worker and the
- * options page.
+ * Reopening makes new windows in which only each window's active tab stays loaded: every other
+ * tab is unloaded (discarded) as soon as its page starts to arrive, so it shows its address and
+ * loads in full when clicked. Chrome gives extensions no way to open a tab unloaded: each tab
+ * asks its site for the page once, and can only be unloaded once the site has answered (see
+ * {@link unloadWhenAnswered}; checked in Chromium by test/e2e/workspaces.mjs). Loaded by the
+ * service worker and the options page.
  *
  * @module shared/workspaces
  */
-import { mainSite, MAX_URL, tabUrl } from './sites.js';
+import { mainSite, MAX_URL, tabUrl, withoutCredentials } from './sites.js';
 import { counted } from '../vendor/extension-kit/index.js';
 import { shortDate } from './text.js';
 
@@ -26,7 +28,7 @@ import { shortDate } from './text.js';
  * One saved tab.
  *
  * @typedef {object} WorkspaceTab
- * @property {string} url Its address.
+ * @property {string} url Its address, without any `user:password@`.
  * @property {string} title Its title when saved (at most {@link MAX_TITLE} characters).
  * @property {true} [pinned] Present when it was pinned.
  * @property {number} [group] Its group: an index into the window's `groups`.
@@ -124,6 +126,7 @@ import { shortDate } from './text.js';
  * @property {{isAllowedFileSchemeAccess(): Promise<boolean>}} extension `chrome.extension`: whether
  *   file:// pages may be opened.
  * @property {StorageArea} local `chrome.storage.local`.
+ * @property {StorageArea} session `chrome.storage.session`: the tabs still to unload.
  */
 
 /** The chrome.storage.local item holding the workspaces, most recently saved first. */
@@ -145,8 +148,12 @@ export const MENU_WORKSPACES = 10;
 const OPENABLE_SCHEMES = new Set(['http:', 'https:', 'file:', 'data:', 'about:', 'chrome:', 'chrome-extension:', 'view-source:']);
 /** chrome:// pages extensions may not open (Chrome answers "I'm sorry. I'm afraid I can't do that."). */
 const BLOCKED_CHROME_PAGES = new Set(['kill', 'crash', 'hang', 'quit', 'restart']);
-/** How long to wait for a new tab's navigation to start before giving up on unloading it. */
-const NAVIGATION_WAIT_MS = 2000;
+/**
+ * What a `chrome.storage.session` item's name starts with when it marks a tab to unload once its
+ * site answers; the tab's id follows. One item per tab, so the service worker and the settings
+ * page can each add and remove them without overwriting the other's.
+ */
+export const UNLOAD_PREFIX = 'unload:';
 /** How long a window state is given to take before it's set again, and how many times. */
 const STATE_WAIT_MS = 200;
 const STATE_TRIES = 5;
@@ -229,7 +236,8 @@ export function snapshotWindows(windows, groups, fileAccess, leaveOut) {
     const groupIndex = new Map();
 
     for (const tab of (win.tabs ?? []).filter((t) => leaveOut === undefined || t.id !== leaveOut).sort((a, b) => a.index - b.index)) {
-      const url = tabUrl(tab);
+      // A password in an address (https://me:secret@site/) isn't kept: the tab reopens without it.
+      const url = withoutCredentials(tabUrl(tab));
       /** @type {WorkspaceTab} */
       const entry = { url, title: (tab.title ?? '').slice(0, MAX_TITLE) };
       if (tab.pinned) entry.pinned = true;
@@ -337,25 +345,57 @@ export function reopenPlan(workspace, { reopenGroups }) {
 }
 
 /**
- * Leave a new tab unloaded: once its navigation has started (it then reports its address),
- * discard it, so it loads only when clicked. Discarded before that, Chrome would forget the
- * address. If the navigation never shows, or Chrome won't discard it, the tab just loads.
- *
- * @param {WorkspaceApis['tabs']} tabs - `chrome.tabs`.
- * @param {Tab} created - The new tab.
- * @returns {Promise<number | undefined>} The tab's id (discarding gives it a new one).
+ * @param {number} tabId - A tab.
+ * @returns {string} The name of the session item that marks it to unload.
  */
-async function leaveUnloaded(tabs, created) {
-  if (created.id === undefined) return undefined;
-  const id = created.id;
-  let tab = created;
-  for (const end = Date.now() + NAVIGATION_WAIT_MS; !tab.url && Date.now() < end;) {
-    await sleep(10);
-    tab = await tabs.get(id);
-  }
-  if (!tab.url) return id;
-  const discarded = await tabs.discard(id).catch(() => undefined);
-  return discarded?.id ?? id;
+const unloadKey = (tabId) => `${UNLOAD_PREFIX}${tabId}`;
+
+/**
+ * Unload (discard) a tab that was marked by {@link unloadWhenAnswered}, if its site has answered:
+ * the tab then reports its address (`url`), and keeps it, its place, pin and group when
+ * discarded. Before that Chrome would forget the address for good (the tab stays blank), so the
+ * tab is left marked for the next call. A tab that's in front by now is left loaded; so is one
+ * Chrome won't discard. Unmarked tabs are never touched.
+ *
+ * Called by the service worker each time a tab reports an address (`chrome.tabs.onUpdated`),
+ * which is how a slow site's tab is unloaded however long it takes to answer, and by
+ * `unloadWhenAnswered` for the sites that answered before their tabs were marked.
+ *
+ * @param {Pick<WorkspaceApis, 'tabs' | 'session'>} apis - `chrome.tabs` and `chrome.storage.session`.
+ * @param {number} tabId - The tab.
+ * @returns {Promise<number>} The tab's id now: a new one if it was discarded, else `tabId`.
+ * @example
+ * chrome.tabs.onUpdated.addListener((tabId, change) => { if (change.url) unloadIfAnswered(apis, tabId); });
+ */
+export async function unloadIfAnswered({ tabs, session }, tabId) {
+  const key = unloadKey(tabId);
+  if (!(key in await session.get([key]))) return tabId;
+  const tab = await tabs.get(tabId).catch(() => undefined);
+  const answered = Boolean(tab?.url);
+  // Still waiting for its site, in the background: it stays marked.
+  if (tab && !answered && !tab.active) return tabId;
+  await session.remove(key);
+  if (!tab || tab.active) return tabId; // Closed, or in front: the user is looking at it.
+  const discarded = await tabs.discard(tabId).catch(() => undefined);
+  return discarded?.id ?? tabId;
+}
+
+/**
+ * Leave new tabs unloaded. Chrome has no way to open a tab unloaded, and discarding one before
+ * its site answers loses its address, so: each tab is marked in `chrome.storage.session`, those
+ * whose sites have already answered are discarded now, and the rest when they answer (the
+ * service worker calls {@link unloadIfAnswered} then, even if it was restarted in between or
+ * this ran on the settings page). Every tab so asks its site for the page once; discarding at
+ * the answer's first bytes stops the rest of the page, and what it would load and run.
+ *
+ * @param {Pick<WorkspaceApis, 'tabs' | 'session'>} apis - `chrome.tabs` and `chrome.storage.session`.
+ * @param {readonly number[]} tabIds - The new tabs (not the ones to keep loaded).
+ * @returns {Promise<number[]>} Their ids now, in the same order (discarding gives a tab a new id).
+ */
+export async function unloadWhenAnswered(apis, tabIds) {
+  if (!tabIds.length) return [];
+  await apis.session.set(Object.fromEntries(tabIds.map((id) => [unloadKey(id), true])));
+  return Promise.all(tabIds.map((id) => unloadIfAnswered(apis, id)));
 }
 
 /**
@@ -397,47 +437,50 @@ async function createWindow(windows, create) {
 /**
  * Reopen one window of a workspace.
  *
- * @param {Pick<WorkspaceApis, 'tabs' | 'windows' | 'tabGroups'>} apis - The chrome APIs.
+ * @param {Pick<WorkspaceApis, 'tabs' | 'windows' | 'tabGroups' | 'session'>} apis - The chrome APIs.
  * @param {WindowPlan} plan - The window's plan.
  * @returns {Promise<{windowId?: number, tabIds: number[]}>} The window and the tabs opened in it.
  */
-async function openWindow({ tabs, windows, tabGroups }, plan) {
+async function openWindow({ tabs, windows, tabGroups, session }, plan) {
   const win = await createWindow(windows, plan.create);
   const windowId = win?.id;
   const first = win?.tabs?.[0]?.id;
   if (windowId === undefined || first === undefined) return { tabIds: [] };
   if (plan.tabs[plan.active].pinned) await tabs.update(first, { pinned: true });
 
-  /** @type {Promise<number | undefined>[]} */
+  /** @type {(number | undefined)[]} Each tab's id, by its index in the plan; undefined for one Chrome refused. */
   const ids = [];
   for (const [index, { url, pinned }] of plan.tabs.entries()) {
     if (index === plan.active) {
-      ids.push(Promise.resolve(first));
+      ids.push(first);
       continue;
     }
     // In order: each tab goes at its own index, before the active tab or after the ones made so far.
     const created = await tabs.create({ windowId, url, index, pinned, active: false }).catch(() => undefined);
-    ids.push(created ? leaveUnloaded(tabs, created) : Promise.resolve(undefined));
+    ids.push(created?.id);
   }
-  const tabIds = await Promise.all(ids);
 
+  // Groups first: unloading gives a tab a new id, and it keeps its group.
   for (const group of plan.groups) {
-    const members = group.tabs.flatMap((index) => tabIds[index] ?? []);
+    const members = group.tabs.flatMap((index) => ids[index] ?? []);
     if (!members.length) continue;
     const groupId = await tabs.group({ tabIds: /** @type {[number, ...number[]]} */ (members), createProperties: { windowId } });
     await tabGroups.update(groupId, { title: group.title, color: group.color, collapsed: group.collapsed });
   }
+  const others = ids.flatMap((id, index) => (id === undefined || index === plan.active ? [] : [id]));
+  const tabIds = [first, ...await unloadWhenAnswered({ tabs, session }, others)];
   if (plan.state !== 'normal') await setWindowState(windows, windowId, plan.state).catch(() => {});
-  return { windowId, tabIds: tabIds.flatMap((id) => id ?? []) };
+  return { windowId, tabIds };
 }
 
 /**
  * Reopen a workspace in new windows, keeping tab order, pinned tabs, groups (when asked) and
- * each window's state. Only each window's active tab loads. A tab Chrome refuses to open is
+ * each window's state. Only each window's active tab stays loaded; the others are unloaded as
+ * their sites answer ({@link unloadWhenAnswered}). A tab Chrome refuses to open is
  * left out rather than stopping the rest, and so is a window that can't be made (or that's
  * closed while its tabs are still being added).
  *
- * @param {WorkspaceApis} apis - `chrome.tabs`, `chrome.windows` and `chrome.tabGroups`.
+ * @param {WorkspaceApis} apis - `chrome.tabs`, `chrome.windows`, `chrome.tabGroups` and `chrome.storage.session`.
  * @param {Workspace} workspace - The workspace.
  * @param {{reopenGroups: boolean}} options - Whether to make its tab groups again (Chrome adds
  *   each group it makes to its saved tab groups).

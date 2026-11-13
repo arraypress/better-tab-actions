@@ -15,7 +15,8 @@ around it holds the tests, scripts, store assets and docs. Same family setup as 
   in-memory Chrome. `background/menu.js` builds the menu (the kit's `contextMenuBuilder`) and
   refreshes its live labels; `background/auto-close.js` and `background/recent.js` are below.
 - **Nothing that matters lives in the worker's memory**: the menu's items are Chrome's, the closed
-  batch (`lastClosed`) and the recent tabs (`recentTabs`) are in `chrome.storage.session`, the
+  batch (`lastClosed`), the recent tabs (`recentTabs`) and the reopened tabs still to unload (`unload:<id>`)
+  are in `chrome.storage.session`, the
   unused-tabs check is a `chrome.alarms` alarm. `test/e2e/worker.mjs` stops the worker (the kit's
   `stopWorker`) and checks each.
 - **Settings** (`shared/settings.js`: the schema for the kit's settings store) always live in
@@ -62,7 +63,8 @@ Kept here because the kit has no equivalent (candidates for it):
   (fails on copied code not listed in a `.jscpd-allowlist.json`; there is none).
 - Unit tests fake only Chrome's edge: `test/fake-browser.js` (tabs, windows, tab groups, file
   access and the kit's fake storage, holding real state and refusing what Chromium refuses:
-  addresses extensions can't open, a window placed mostly off the screen) and
+  addresses extensions can't open, a window placed mostly off the screen; sites listed as `slow`
+  don't answer until told, and a tab discarded before then loses its address) and
   `test/fake-chrome.js` around it (the menu Chrome holds, alarms, and the events Chrome fires),
   which the real `startWorker` runs against. The words are the real `_locales`, through the kit's
   `messageLookup` (`test/helpers.js` `WORDS`).
@@ -76,8 +78,8 @@ Kept here because the kit has no equivalent (candidates for it):
   `test/e2e/`: `groups.mjs`, `workspaces.mjs`, `worker.mjs` (shortcuts, and the worker stopped),
   `auto-close.mjs`, `options.mjs` and `toolbar.mjs` (the last two load `extension/` itself). Each
   runs through the kit's `runChecks` (clean-ups always; a check that hangs fails after 60 s).
-  `test/e2e/helpers.mjs` holds what they share (made-up `*.example` sites with request counts,
-  opening a window, `click` and `press` through the hook).
+  `test/e2e/helpers.mjs` holds what they share (made-up `*.example` sites on a real local server
+  that counts requests, opening a window, `click` and `press` through the hook).
 - `test/package.test.js`: the zip is exactly `extension/` (less the SVG sources), every path the
   extension names resolves inside it, no command has a `suggested_key`, and the store build has
   no test hook.
@@ -120,7 +122,7 @@ time (`chrome.windows.create` with a list fails whole if Chrome refuses one addr
 rename dialog, toasts with Undo: the kit's `createMenu`/`moreActionsButton`, `askText` and `createToast`; the
 keyboard focus stays in the list when it's redrawn). Stored under `workspaces` in `chrome.storage.local`
 only (it's browsing history: never sync), bounded to 40 workspaces × 500 tabs × 200 KB, URLs ≤ 8,192 characters,
-titles ≤ 200. There's no save confirmation beyond what the extension already does for its actions: the menu
+titles ≤ 200. A `user:password@` in an address is dropped before it's stored (`withoutCredentials` in `shared/sites.js`). There's no save confirmation beyond what the extension already does for its actions: the menu
 updates (the new workspace heads "Open workspace", as "Reopen 3 closed tabs" appears after closing), like Chrome's
 own "Bookmark all tabs" shows nothing after saving.
 
@@ -129,11 +131,26 @@ What real Chromium does (checked with Playwright's Chromium 156, `test/e2e/works
   chrome://kill|crash|hang|quit|restart, and `file:` without file access. `view-source:`, `data:`, `about:`,
   extension pages and other chrome:// pages open fine, so they're kept (`reopenable()`); `blob:` and
   `chrome-error:` are skipped as there'd be nothing to show.
-- **Unloaded tabs.** `chrome.tabs.discard` straight after `tabs.create` **loses the URL** (the tab stays blank
-  for good). Waiting until the new tab reports its `url` (its navigation has started; ~20 ms) and then
-  discarding keeps the URL, sends **no request**, and the tab loads when activated in a visible window.
-  Discarding gives the tab a **new id**. So: each window opens with its active tab only, the rest are created,
-  discarded that way, then grouped by their new ids.
+- **Unloaded tabs.** Chrome gives extensions **no way to open a tab unloaded** (`tabs.create` has no such
+  option, unlike Firefox's `discarded`; the unloaded tabs of Chrome's own session restore can't be made by an
+  extension). A new tab has only a `pendingUrl` until its site's answer starts to arrive (the response
+  headers), when it reports its `url`. `chrome.tabs.discard` before that **loses the address for good** (the tab
+  stays blank, and nothing loads when it's clicked), whether straight after `tabs.create`, once `pendingUrl`
+  shows, or 500 ms into a 3 s wait; and the request has already left (the server saw it when the tab was
+  discarded 5 ms after `create`). From `url` on, discarding keeps the address, place, pin and group, and stops
+  the rest of the page (the server sees the connection close). So **every reopened tab asks its site for the
+  page once**, and the best Chrome allows is to discard at the first bytes: `unloadWhenAnswered` marks each new
+  tab in `chrome.storage.session` (`unload:<tabId>`, one item a tab, so the worker and the settings page
+  never overwrite each other), discards those already answered, and the worker's `tabs.onUpdated` listener
+  (`unloadIfAnswered`, on a `url` change) discards the rest when they answer, however long that takes and
+  whichever run of the worker hears it. A tab the user has brought to the front by then stays loaded. A tab
+  discarded before its `<title>` arrived shows its address as its title until clicked. Discarding gives the
+  tab a **new id**, so groups are made first. Marks of tabs closed while waiting are left: harmless, and gone
+  when Chrome quits.
+- **Counting requests.** Playwright's `context.route` doesn't see the requests of tabs an extension opens in
+  the background (six fully loading tabs counted as two), which is how "sends no request" was once believed.
+  `test/e2e/helpers.mjs` serves the `*.example` sites from a real local server (the kit's `serve`, HTTPS,
+  `--host-resolver-rules`) and counts there; `slow.example` answers after 3 s.
 - **Window state.** A state set right after tabs are added to a new window is dropped (reads back "normal" a
   moment later, headed too), so `setWindowState` sets it again until it holds. Bounds and a non-normal state
   can't be given together, so windows open normal at their bounds and change state last.
