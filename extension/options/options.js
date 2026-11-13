@@ -10,15 +10,16 @@
  */
 
 import {
-  byId, createSettingsSaver, createSiteList, setAboutLinks, setShortcuts, siteHost, statusFlasher, valueRow,
+  byId, createSettingsSaver, createSiteList, make, setAboutLinks, setShortcuts, siteHost, statusFlasher, valueRow,
   watchColorScheme, withoutSite, withSite, withSiteReplaced,
 } from '../vendor/extension-kit/index.js';
 import { ABOUT_LINKS } from './about-links.js';
-import { ACTIONS, menuTitle } from '../shared/actions.js';
+import { ACTIONS, menuTitle, SWITCH_LAST } from '../shared/actions.js';
 import { AUTO_CLOSE_HOURS, normalizeSettings, settingsStore } from '../shared/settings.js';
-import { duration } from '../shared/text.js';
+import { duration, noun } from '../shared/text.js';
 import { startWorkspaces } from './workspaces-section.js';
 
+/** @import { Action } from '../shared/actions.js' */
 /** @import { Settings } from '../shared/settings.js' */
 
 const windowScope = byId('windowScope', HTMLSelectElement);
@@ -49,39 +50,33 @@ const keepSites = createSiteList({
 });
 
 /**
- * A settings row: a label and its control.
+ * The Menu card's rows, one per action in menu order: a label and its switch. Made once and
+ * updated in place, so a switch keeps the keyboard focus when it's turned on or off.
  *
- * @param {string} labelText - What the row says.
- * @param {HTMLElement} control - Its switch.
- * @returns {HTMLLabelElement} The row.
+ * @type {{action: Action, text: HTMLSpanElement, toggle: HTMLInputElement}[]}
  */
-function row(labelText, control) {
-  const label = document.createElement('label');
-  label.className = 'row';
-  const text = document.createElement('span');
-  text.className = 'label';
-  text.textContent = labelText;
-  label.append(text, control);
-  return label;
-}
+const menuRows = ACTIONS.map((action) => {
+  const toggle = make('input', 'switch');
+  toggle.type = 'checkbox';
+  toggle.setAttribute('role', 'switch');
+  toggle.addEventListener('change', () => {
+    const hidden = new Set(settings.hiddenActions);
+    if (toggle.checked) hidden.delete(action.id);
+    else hidden.add(action.id);
+    save({ hiddenActions: [...hidden] });
+  });
+  const text = make('span', 'label');
+  const row = make('label', 'row');
+  row.append(text, toggle);
+  byId('menu-items').append(row);
+  return { action, text, toggle };
+});
 
-/** One switch per action, in menu order, all in the Menu card. */
+/** Show each action's title (it can depend on the settings: the number of days) and whether it's in the menu. */
 function renderMenuItems() {
-  const list = byId('menu-items');
-  list.replaceChildren();
-  for (const action of ACTIONS) {
-    const toggle = document.createElement('input');
-    toggle.type = 'checkbox';
-    toggle.className = 'switch';
-    toggle.setAttribute('role', 'switch');
+  for (const { action, text, toggle } of menuRows) {
+    text.textContent = menuTitle(action, settings);
     toggle.checked = !settings.hiddenActions.includes(action.id);
-    toggle.addEventListener('change', () => {
-      const hidden = new Set(settings.hiddenActions);
-      if (toggle.checked) hidden.delete(action.id);
-      else hidden.add(action.id);
-      save({ hiddenActions: [...hidden] });
-    });
-    list.append(row(menuTitle(action, settings), toggle));
   }
 }
 
@@ -91,8 +86,8 @@ function renderMenuItems() {
  * link row says so.
  */
 async function renderShortcuts() {
-  // "Switch to last used tab" is a shortcut only (no menu item), listed first like on Chrome's page.
-  const shortcuts = setShortcuts([{ id: 'switch-last-tab', title: 'Switch to last used tab' }, ...ACTIONS], await chrome.commands.getAll());
+  // "Switch to last used tab" is a shortcut only (no menu item), listed first.
+  const shortcuts = setShortcuts([{ id: SWITCH_LAST, title: 'Switch to last used tab' }, ...ACTIONS], await chrome.commands.getAll());
   byId('shortcuts').replaceChildren(...shortcuts.map(({ title, shortcut }) => valueRow(title, shortcut)));
   byId('edit-shortcuts').classList.toggle('first', shortcuts.length === 0);
   byId('no-shortcuts').hidden = shortcuts.length > 0;
@@ -106,14 +101,16 @@ async function renderShortcuts() {
 function save(changes) {
   settings = normalizeSettings({ ...settings, ...changes });
   saver.save(/** @type {Partial<Settings>} */ (changes));
-  renderMenuItems(); // Titles can depend on settings (e.g. the number of days).
-  renderForm();
+  render();
 }
 
-/** Show the settings in the Closing tabs and Workspaces cards' controls. */
-function renderForm() {
+/** Show the settings: the Menu card's switches, and the Closing tabs and Workspaces cards' controls. */
+function render() {
+  renderMenuItems();
   windowScope.value = settings.windowScope;
-  inactiveDays.value = String(settings.inactiveDays);
+  // What's being typed is left alone: the field shows the stored (clamped) number once it's left.
+  if (document.activeElement !== inactiveDays) inactiveDays.value = String(settings.inactiveDays);
+  byId('days-unit').textContent = noun(settings.inactiveDays, 'day');
   includeGroupedTabs.checked = settings.includeGroupedTabs;
   reopenGroups.checked = settings.reopenGroups;
   autoClose.checked = settings.autoClose;
@@ -131,8 +128,9 @@ byId('memory-saver').addEventListener('click', () => {
   chrome.tabs.create({ url: 'chrome://settings/performance' });
 });
 inactiveDays.addEventListener('change', () => {
-  save({ inactiveDays: inactiveDays.value });
-  inactiveDays.value = String(settings.inactiveDays); // Show the clamped value.
+  // An emptied field (or one Chrome can't read a number from) keeps the number it had.
+  if (inactiveDays.value.trim() !== '') save({ inactiveDays: inactiveDays.value });
+  inactiveDays.value = String(settings.inactiveDays); // Show the stored (clamped) number.
 });
 byId('edit-shortcuts').addEventListener('click', () => {
   chrome.tabs.create({ url: 'chrome://extensions/shortcuts' });
@@ -147,19 +145,16 @@ document.addEventListener('visibilitychange', () => {
 addEventListener('pagehide', () => saver.flush());
 
 // Settings can change without this page: from another computer, through sync, or in another tab.
-// Changes made here and not yet written stay on top.
-chrome.storage.onChanged.addListener(async (changes, area) => {
-  if (!settingsStore.changed(changes, area).length) return;
-  settings = normalizeSettings({ ...(await settingsStore.load(chrome.storage)), ...saver.pending });
-  renderForm();
-  renderMenuItems();
-});
+// Changes made here and not yet written stay on top (the saver lays them over what storage holds).
+saver.follow((changed) => {
+  settings = changed;
+  render();
+}, chrome.storage.onChanged);
 
 // About card: the version Chrome loaded, and the links from about-links.js.
 byId('version').textContent = `Version ${chrome.runtime.getManifest().version}`;
 setAboutLinks(ABOUT_LINKS);
 
-renderForm();
-renderMenuItems();
+render();
 renderShortcuts();
 startWorkspaces(() => settings);

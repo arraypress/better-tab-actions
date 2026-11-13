@@ -13,7 +13,7 @@
  * @module shared/settings
  */
 
-import { createSettingsStore, MAX_SYNC_ITEM_BYTES, siteHost } from '../vendor/extension-kit/index.js';
+import { createSettingsStore, MAX_SYNC_ITEM_BYTES, siteHost, syncItemBytes } from '../vendor/extension-kit/index.js';
 
 /**
  * @typedef {object} Settings
@@ -38,7 +38,7 @@ export const AUTO_CLOSE_HOURS = /** @type {readonly number[]} */ (Object.freeze(
 
 /**
  * The never-close sites, valid and without repeats, cut where the list would no longer fit one
- * Chrome Sync item (8,192 bytes, key included).
+ * Chrome Sync item (8,192 bytes, key included, counted as Chrome counts them: the kit's `syncItemBytes`).
  *
  * @param {unknown} raw - A stored or typed list.
  * @returns {string[]} The sites.
@@ -48,7 +48,7 @@ function keepSitesFrom(raw) {
   /** @type {string[]} */
   const kept = [];
   for (const site of sites) {
-    if (new TextEncoder().encode(`keepSites${JSON.stringify([...kept, site])}`).length > MAX_SYNC_ITEM_BYTES) break;
+    if (syncItemBytes('keepSites', [...kept, site]) > MAX_SYNC_ITEM_BYTES) break;
     kept.push(site);
   }
   return kept;
@@ -70,6 +70,19 @@ export const DEFAULTS = /** @type {Readonly<Settings>} */ (Object.freeze({
 }));
 
 /**
+ * A number from a stored or typed value: a number, or text that holds one. Anything else (an
+ * emptied field's '', null, true) is no number, so it takes the setting's default instead of
+ * counting as 0 or 1.
+ *
+ * @param {unknown} raw - A stored or typed value.
+ * @returns {number} The number, or NaN.
+ * @example
+ * numberFrom('14.4'); // 14.4
+ * numberFrom('');     // NaN (Number('') is 0)
+ */
+const numberFrom = (raw) => (typeof raw === 'number' || (typeof raw === 'string' && raw.trim() !== '') ? Number(raw) : NaN);
+
+/**
  * Coerce anything read from storage (or a form) into valid settings: junk
  * falls back to the default, days are rounded and clamped, hidden actions
  * de-duplicated, the automatic age is one offered, kept sites are valid hosts.
@@ -81,7 +94,8 @@ export const DEFAULTS = /** @type {Readonly<Settings>} */ (Object.freeze({
  * // { ...DEFAULTS, inactiveDays: 14 }
  */
 export function normalizeSettings(raw = {}) {
-  const days = Math.round(Number(raw.inactiveDays));
+  const days = Math.round(numberFrom(raw.inactiveDays));
+  const hours = numberFrom(raw.autoCloseHours);
   return {
     hiddenActions: Array.isArray(raw.hiddenActions)
       ? [...new Set(raw.hiddenActions.filter((id) => typeof id === 'string'))]
@@ -90,7 +104,7 @@ export function normalizeSettings(raw = {}) {
     windowScope: raw.windowScope === 'all' || raw.windowScope === 'window' ? raw.windowScope : DEFAULTS.windowScope,
     includeGroupedTabs: typeof raw.includeGroupedTabs === 'boolean' ? raw.includeGroupedTabs : DEFAULTS.includeGroupedTabs,
     autoClose: typeof raw.autoClose === 'boolean' ? raw.autoClose : DEFAULTS.autoClose,
-    autoCloseHours: AUTO_CLOSE_HOURS.includes(Number(raw.autoCloseHours)) ? Number(raw.autoCloseHours) : DEFAULTS.autoCloseHours,
+    autoCloseHours: AUTO_CLOSE_HOURS.includes(hours) ? hours : DEFAULTS.autoCloseHours,
     keepSites: keepSitesFrom(raw.keepSites),
     reopenGroups: typeof raw.reopenGroups === 'boolean' ? raw.reopenGroups : DEFAULTS.reopenGroups,
   };

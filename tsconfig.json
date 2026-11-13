@@ -9,7 +9,9 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "types": ["chrome", "node"],
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    // test/e2e/hook.js runs from the e2e build's root, so it imports as if it sat in extension/.
+    "rootDirs": ["extension", "test/e2e"]
   },
   "include": ["extension/**/*.js", "test/**/*.js", "test/**/*.mjs", "scripts/**/*.mjs", "store/**/*.mjs", "docs/**/*.js", "eslint.config.js"],
   "exclude": ["extension/vendor/**"]

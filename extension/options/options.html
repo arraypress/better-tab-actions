@@ -30,7 +30,7 @@
     <h2 class="section-title" id="workspaces">Workspaces</h2>
     <section class="card" aria-labelledby="workspaces">
       <p id="no-workspaces" class="row text" hidden><span class="label">Workspaces you save appear here. To save your windows, right-click a tab and choose <strong>More tab actions</strong> › <strong>Save windows as workspace</strong>.</span></p>
-      <ul id="workspace-list" class="list"></ul>
+      <ul id="workspace-list" class="list" aria-labelledby="workspaces"></ul>
       <p id="workspaces-full" class="row text" hidden><span class="label">You can keep up to 40 workspaces. Delete one to save another.</span></p>
       <label class="row two-line">
         <span class="label">
@@ -58,7 +58,7 @@
           <span>Inactive after</span>
           <span class="secondary">Used by “Close tabs not used in …”</span>
         </label>
-        <span class="days"><input id="inactiveDays" type="number" min="1" max="365" step="1" inputmode="numeric"> days</span>
+        <span class="days"><input id="inactiveDays" type="number" min="1" max="365" step="1" inputmode="numeric"> <span id="days-unit">days</span></span>
       </div>
       <label class="row two-line">
         <span class="label">
@@ -83,11 +83,11 @@
           <select id="autoCloseHours"></select>
         </div>
         <div class="row">
-          <span class="label">Never close tabs from these sites</span>
+          <span class="label" id="keep-sites-label">Never close tabs from these sites</span>
           <button id="add-site" type="button">Add</button>
         </div>
         <p id="no-sites" class="row text"><span class="label">No sites added</span></p>
-        <ul id="site-list" class="list"></ul>
+        <ul id="site-list" class="list" aria-labelledby="keep-sites-label"></ul>
       </div>
       <button id="memory-saver" type="button" class="link-row external">
         <span class="label">

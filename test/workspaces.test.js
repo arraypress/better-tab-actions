@@ -9,11 +9,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { menuEntries, menuState, MANAGE_WORKSPACES, WORKSPACE_ITEM_PREFIX } from '../extension/shared/actions.js';
 import { DEFAULTS, normalizeSettings } from '../extension/shared/settings.js';
+import { MAX_URL } from '../extension/shared/sites.js';
 import {
-  loadWorkspaces, MAX_BYTES, MAX_TABS, MAX_TITLE, MAX_URL, MAX_WORKSPACES, MENU_WORKSPACES, reopenable, reopenPlan,
+  loadWorkspaces, MAX_BYTES, MAX_TABS, MAX_TITLE, MAX_WORKSPACES, MENU_WORKSPACES, reopenable, reopenPlan,
   replaceWorkspace, snapshotWindows, updateWorkspaces, workspaceName, workspaceSummary,
 } from '../extension/shared/workspaces.js';
-import { EXTENSION_ID, fakeBrowser, runOn } from './fake-browser.js';
+import { EXTENSION_ID, fakeBrowser, runOn, SCREEN } from './fake-browser.js';
+import { errorsLogged } from './helpers.js';
 
 /** @import { OpenWindow, Workspace, WorkspaceWindow } from '../extension/shared/workspaces.js' */
 /** @import { Settings } from '../extension/shared/settings.js' */
@@ -274,6 +276,50 @@ test('open-workspace: new windows with the same tabs, order, pinned tab, group, 
   assert.deepEqual(b.window(w1), { state: 'normal', type: 'normal', focused: true, left: 5, top: 6, width: 1000, height: 700 });
   assert.equal(b.window(w2)?.state, 'maximized');
   assert.equal(b.window(w2)?.focused, false);
+});
+
+test('open-workspace: a window saved on a screen that’s gone opens where Chrome puts it, at its size (fitted to this screen)', async () => {
+  // Chrome refuses a new window less than half on a screen, and with it went the whole workspace.
+  const b = fakeBrowser([
+    { id: 1, url: 'https://a.com/', active: true },
+    { id: 2, url: 'https://b.com/', windowId: 2, active: true },
+    { id: 3, url: 'https://c.com/', windowId: 3, active: true },
+  ], {
+    windows: {
+      1: { left: 100, top: 50, width: 1200, height: 800 }, // On this screen.
+      2: { left: SCREEN.width + 640, top: 0, width: 1400, height: 900 }, // On a second display.
+      3: { left: -20000, top: -20000, width: 9000, height: 5000 }, // Nowhere, and bigger than this screen twice over.
+    },
+  });
+  await run(b, 'save-workspace', 1);
+  for (const id of [1, 2, 3]) await b.windows.remove(id); // The laptop is unplugged from the display.
+
+  assert.equal((await run(b, 'open-workspace', null)).length, 3);
+  assert.deepEqual(b.windowIds.map((id) => [b.described(id).join(), b.window(id)]), [
+    ['https://a.com/', { state: 'normal', type: 'normal', focused: true, left: 100, top: 50, width: 1200, height: 800 }],
+    ['https://b.com/', { state: 'normal', type: 'normal', focused: false, width: 1400, height: 900 }],
+    ['https://c.com/', { state: 'normal', type: 'normal', focused: false, width: SCREEN.width, height: SCREEN.height }],
+  ]);
+});
+
+test('open-workspace: a window Chrome won’t open is left out and logged; the windows after it still open', async () => {
+  const b = fakeBrowser([
+    { id: 1, url: 'file:///Users/me/notes.html', active: true },
+    { id: 2, url: 'https://a.com/', windowId: 2, active: true },
+    { id: 3, url: 'file:///Users/me/more.html', windowId: 2 },
+  ], { fileAccess: true });
+  await run(b, 'save-workspace', 1);
+  await b.windows.remove(1);
+  await b.windows.remove(2);
+  b.setFileAccess(false); // “Allow access to file URLs” turned off since it was saved.
+
+  /** @type {number[]} */
+  let opened = [];
+  const logged = await errorsLogged(async () => { opened = await run(b, 'open-workspace', null); });
+  assert.equal(opened.length, 1);
+  assert.deepEqual(Object.values(b.layout()), [['https://a.com/']]);
+  assert.equal(logged.length, 1);
+  assert.match(logged[0], /^Reopening a window: Error: Cannot navigate to a file URL without local file access\./);
 });
 
 test('open-workspace: Chrome saves each group it reopens; with “Reopen tab groups” off, tabs come back ungrouped and nothing is added', async () => {

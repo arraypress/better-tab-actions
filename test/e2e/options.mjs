@@ -7,16 +7,18 @@
  *
  * Checks: settings are written to Chrome Sync, a burst of clicks is one write, a change still
  * waiting is written as the page closes, the background's menu follows, there's no sync switch,
- * and the About card shows the manifest's version and the links from about-links.js.
+ * the About card shows the manifest's version and the links from about-links.js, the Keyboard
+ * shortcuts card lists only the keys a person has set, and a switch turned on or off from the
+ * keyboard keeps the focus.
  *
  * @module test/e2e/options
  */
 import { chromium } from 'playwright';
 import { readFile } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
-import { launchExtension, until } from '@arraypress/extension-kit/testing';
+import { checkRunner, launchExtension, runChecks, until } from '@arraypress/extension-kit/testing';
 import { ABOUT_LINKS } from '../../extension/options/about-links.js';
+import { EXTENSION } from './helpers.mjs';
 
 /**
  * The service worker's global scope, with this check's count of writes to Chrome Sync.
@@ -24,10 +26,11 @@ import { ABOUT_LINKS } from '../../extension/options/about-links.js';
  * @typedef {typeof globalThis & {syncWrites: number}} WorkerScope
  */
 
-const extension = fileURLToPath(new URL('../../extension', import.meta.url));
-const { context, worker, url, close } = await launchExtension(chromium, extension, { prefix: 'mta-e2e-' });
+const { context, worker, url, close } = await launchExtension(chromium, EXTENSION, { prefix: 'bta-options-' });
+const runner = checkRunner();
+const { check, fail } = runner;
 
-try {
+await runChecks(runner, async () => {
   // Local holds only what's this computer's: the toolbar glyph's scheme (toolbar-theme.js) aside, nothing.
   /** What sync and local hold (local without the toolbar glyph's key). */
   const stored = () => worker.evaluate(async () => {
@@ -42,16 +45,27 @@ try {
     scope.syncWrites = 0;
     chrome.storage.sync.onChanged.addListener(() => { scope.syncWrites++; });
   });
-  /** Open the options page once its menu switches are drawn. */
-  const open = async () => {
+  /**
+   * Open the options page once its menu switches are drawn; an error in the page fails the run.
+   *
+   * @param {Record<string, string>} [keys] - Keyboard shortcuts as if a person had set them at
+   *   chrome://extensions/shortcuts (no API sets one): what `chrome.commands.getAll` tells the page, by command.
+   */
+  const open = async (keys) => {
     const page = await context.newPage();
+    page.on('pageerror', (error) => fail(`page error: ${error.message}`));
+    if (keys) {
+      await page.addInitScript((set) => {
+        const getAll = chrome.commands.getAll.bind(chrome.commands);
+        chrome.commands.getAll = /** @type {typeof chrome.commands.getAll} */ (async () => (await getAll()).map((command) => ({ ...command, shortcut: set[command.name ?? ''] ?? command.shortcut })));
+      }, keys);
+    }
     await page.goto(url('options/options.html'));
     await page.waitForFunction(() => document.getElementById('menu-items')?.children.length);
     return page;
   };
 
-  // 1. The page: no sync switch; the About card last, as chrome://settings/help.
-  {
+  await check('no sync switch; the About card comes last with the manifest’s version and the configured links', async () => {
     const page = await open();
     const text = await page.locator('main').innerText();
     assert.equal(await page.locator('#syncSettings').count(), 0);
@@ -63,11 +77,29 @@ try {
     assert.equal(await page.locator('#report-issue').getAttribute('href'), ABOUT_LINKS.reportIssue);
     assert.equal(await page.locator('#privacy-policy').getAttribute('href'), ABOUT_LINKS.privacyPolicy);
     await page.close();
-    console.log(`✔ no sync switch; About card shows Version ${version} and the configured links`);
-  }
+  });
 
-  // 2. A burst of clicks is one write to Chrome Sync, after the clicks stop; the menu follows.
-  {
+  await check('no keyboard shortcut is set by default: the card says so and leads to Chrome’s page', async () => {
+    const page = await open();
+    assert.equal(await page.locator('#shortcuts .row').count(), 0);
+    assert.equal(await page.locator('#edit-shortcuts').innerText(), 'Keyboard shortcuts\nNone set yet. Add them on Chrome’s Keyboard shortcuts page.');
+    const opened = context.waitForEvent('page');
+    await page.locator('#edit-shortcuts').click();
+    const shortcuts = await opened;
+    assert.equal(shortcuts.url(), 'chrome://extensions/shortcuts');
+    await shortcuts.close();
+    await page.close();
+  });
+
+  await check('keys a person has set are listed, in the menu’s order with “Switch to last used tab” first; the rest aren’t', async () => {
+    const page = await open({ 'sort-tabs-by-site': '⌃⇧S', 'switch-last-tab': '⌃⇧L', 'close-site-tabs': '⌃⇧W' });
+    assert.deepEqual(await page.locator('#shortcuts .row').allInnerTexts(), ['Switch to last used tab\n⌃⇧L', 'Close tabs from this site\n⌃⇧W', 'Sort tabs by site\n⌃⇧S']);
+    assert.equal(await page.locator('#no-shortcuts').isVisible(), false);
+    assert.equal(await page.locator('#edit-shortcuts').innerText(), 'Keyboard shortcuts');
+    await page.close();
+  });
+
+  await check('a burst of clicks is one write to Chrome Sync, after the clicks stop; the page and the menu read it back', async () => {
     const page = await open();
     const grouped = page.locator('#includeGroupedTabs');
     for (let i = 0; i < 9; i++) await grouped.click(); // Ends off.
@@ -86,17 +118,44 @@ try {
     await page.waitForFunction(() => /** @type {HTMLInputElement | null} */ (document.getElementById('inactiveDays'))?.value === '30');
     assert.equal(await grouped.isChecked(), false);
     await page.close();
-    console.log('✔ eleven quick changes made one sync write; the page and menu read them back from sync');
-  }
+  });
 
-  // 3. Closing the page writes a change still waiting.
-  {
+  await check('closing the page writes a change still waiting', async () => {
     const page = await open();
     await page.locator('#windowScope').selectOption('window');
     await page.close({ runBeforeUnload: true });
     await until(async () => (await stored()).sync.windowScope === 'window', 'the change to reach sync');
-    console.log('✔ a change still waiting is written as the page closes');
-  }
-} finally {
-  await close();
-}
+  });
+
+  await check('a switch turned off and on from the keyboard keeps the focus, and Tab goes on to the next switch', async () => {
+    const page = await open();
+    const switches = page.locator('#menu-items input');
+    await switches.nth(2).focus();
+    await page.keyboard.press('Space');
+    assert.equal(await switches.nth(2).isChecked(), false);
+    assert.equal(await switches.nth(2).evaluate((element) => element === document.activeElement), true, 'still on the switch just turned off');
+    await page.keyboard.press('Space');
+    assert.equal(await switches.nth(2).isChecked(), true);
+    await page.keyboard.press('Tab');
+    assert.equal(await switches.nth(3).evaluate((element) => element === document.activeElement), true);
+    await page.close();
+  });
+
+  await check('the days’ unit follows the number, here and in the menu’s label: “1 day”, “30 days”; an emptied field keeps its number', async () => {
+    const page = await open();
+    const days = page.locator('#inactiveDays');
+    /** The number field and its unit, and the Menu card's row for the inactive action. */
+    const shown = async () => [`${await days.inputValue()} ${await page.locator('#days-unit').innerText()}`, await page.locator('#menu-items label').nth(3).innerText()];
+    assert.deepEqual(await shown(), ['30 days', 'Close tabs not used in 30 days']);
+    await days.fill('1');
+    await days.press('Enter');
+    assert.deepEqual(await shown(), ['1 day', 'Close tabs not used in 1 day']);
+    await days.fill('900');
+    await days.press('Tab');
+    assert.deepEqual(await shown(), ['365 days', 'Close tabs not used in 365 days'], 'clamped as the field is left');
+    await days.fill('');
+    await days.press('Tab');
+    assert.deepEqual(await shown(), ['365 days', 'Close tabs not used in 365 days'], 'an emptied field keeps its number (it became 1 day)');
+    await page.close({ runBeforeUnload: true });
+  });
+}, [close]);

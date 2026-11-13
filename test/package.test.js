@@ -1,12 +1,12 @@
 /**
- * The store zip is exactly extension/, less source-only files, and every path the extension
- * names resolves inside it.
+ * The store zip is exactly extension/, less source-only files; every path the extension names
+ * resolves inside it; and the manifest ships no default keyboard shortcut and no test hook.
  *
  * @module test/package
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cp, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -43,4 +43,22 @@ test('package: .DS_Store files anywhere in extension/ are left out', async () =>
 
 test('package: every path the extension names resolves to a file inside extension/', async () => {
   assert.deepEqual(await missingReferences(extension, [OFFSCREEN_PATH]), []);
+});
+
+test('manifest: no command has a default key (people set their own at chrome://extensions/shortcuts)', async () => {
+  // Alt+Shift+letter types a character on a Mac and switches the keyboard's language on Windows.
+  const { commands } = JSON.parse(await readFile(path.join(extension, 'manifest.json'), 'utf8'));
+  assert.ok(Object.keys(commands).length > 0, 'the commands stay, so keys can be set');
+  for (const [name, command] of Object.entries(commands)) {
+    assert.equal(/** @type {{suggested_key?: unknown}} */ (command).suggested_key, undefined, name);
+    assert.ok(/** @type {{description?: string}} */ (command).description, `${name} has a description for Chrome’s shortcuts page`);
+  }
+});
+
+test('the store build has no test hook: the worker is background.js and puts nothing on its global scope', async () => {
+  const { background } = JSON.parse(await readFile(path.join(extension, 'manifest.json'), 'utf8'));
+  assert.equal(background.service_worker, 'background/background.js');
+  for (const file of (await filesUnder(extension)).filter((name) => name.endsWith('.js') && !name.startsWith('vendor/'))) {
+    assert.doesNotMatch(await readFile(path.join(extension, file), 'utf8'), /globalThis/, file);
+  }
 });

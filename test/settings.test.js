@@ -46,6 +46,16 @@ test('normalizeSettings: rejects junk and clamps days to 1–365', () => {
   assert.equal(normalizeSettings({ reopenGroups: false }).reopenGroups, false);
 });
 
+test('normalizeSettings: what holds no number (an emptied field, null, true) takes the default, not 1', () => {
+  // Number('') and Number(null) are 0, Number(true) is 1: an emptied days field became “1 day”.
+  for (const junk of ['', '  ', null, true, false, [], {}]) {
+    assert.equal(normalizeSettings({ inactiveDays: junk }).inactiveDays, DEFAULTS.inactiveDays, JSON.stringify(junk));
+    assert.equal(normalizeSettings({ autoCloseHours: junk }).autoCloseHours, DEFAULTS.autoCloseHours, JSON.stringify(junk));
+  }
+  assert.equal(normalizeSettings({ inactiveDays: ' 12 ' }).inactiveDays, 12);
+  assert.equal(normalizeSettings({ autoCloseHours: '1' }).autoCloseHours, 1);
+});
+
 test('every setting is synced: none is tied to one computer', () => {
   assert.deepEqual(settingsStore.localKeys, []);
   assert.deepEqual(settingsStore.syncedKeys, Object.keys(DEFAULTS));

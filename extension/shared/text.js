@@ -6,6 +6,17 @@
  */
 
 /**
+ * A noun in the number a count takes: plural when the count isn't 1.
+ *
+ * @param {number} n - How many.
+ * @param {string} word - The singular noun; the plural adds "s".
+ * @returns {string} "day" for 1, else "days".
+ * @example
+ * noun(1, 'day'); // 'day'
+ */
+export const noun = (n, word) => (n === 1 ? word : `${word}s`);
+
+/**
  * A count and its noun, plural when it isn't 1.
  *
  * @param {number} n - How many.
@@ -14,7 +25,7 @@
  * @example
  * plural(3, 'window'); // '3 windows'
  */
-export const plural = (n, word) => `${n} ${n === 1 ? word : `${word}s`}`;
+export const plural = (n, word) => `${n} ${noun(n, word)}`;
 
 /**
  * A short date, as Chrome writes one in lists: day and month, plus the year when it isn't the

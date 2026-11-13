@@ -1,9 +1,11 @@
 /**
  * In-memory stand-in for the browser edge: chrome.tabs, chrome.windows, chrome.tabGroups,
- * chrome.extension's file access and chrome.storage.session and .local (@arraypress/extension-kit's
- * fake storage). Holds real state (window membership, state and bounds, tab order, pinned and
- * discarded tabs, groups, saved groups, mute) so tests check outcomes, not calls. Also `runOn`,
- * which runs an action against it as the background does.
+ * chrome.extension's file access and chrome.storage (@arraypress/extension-kit's fake storage).
+ * Holds real state (window membership, focus, state and bounds, tab order, active, pinned and
+ * discarded tabs, groups, saved groups, mute) and refuses what Chromium refuses (addresses
+ * extensions can't open, windows mostly off the screen), so tests check outcomes, not calls. Also
+ * `runOn`, which runs an action against it as the background does. test/fake-chrome.js adds the
+ * events and the rest of `chrome` around it, for the service worker.
  *
  * @module test/fake-browser
  */
@@ -53,6 +55,16 @@ import { DEFAULTS } from '../extension/shared/settings.js';
  * @typedef {{title: string, groupId: number | null, urls?: (string | undefined)[]}} SavedGroup
  */
 
+/**
+ * The screen the fake's windows open on. Chromium refuses a new window given a position that
+ * leaves less than half of it on a screen (`chrome.windows.create` at left 100000 rejects with
+ * {@link OFF_SCREEN}), and fits a window given only a size to the screen (9000×5000 opens at the
+ * screen's size). Both checked in Chromium 156.
+ */
+export const SCREEN = Object.freeze({ width: 1920, height: 1080 });
+/** Chromium's error for bounds mostly off every screen (windows_api.cc). */
+export const OFF_SCREEN = 'Invalid value for bounds. Bounds must be at least 50% within visible screen space.';
+
 /** The id the fake's own extension has. */
 export const EXTENSION_ID = 'test-extension-id';
 
@@ -98,6 +110,8 @@ export const tabsAt = (...urls) => urls.map((url, i) => ({ id: i + 1, url }));
  * @returns The APIs `runAction` takes, plus getters for what tests check.
  */
 export function fakeBrowser(initialTabs, { focusedWindowId = 1, windows: windowSeeds = {}, fileAccess = false } = {}) {
+  /** The window Chrome treats as last focused; follows `windows.update({focused})` and new windows. */
+  let lastFocused = focusedWindowId;
   let nextTabId = 1000;
   let nextWindowId = 100;
   let nextGroupId = 500;
@@ -121,6 +135,20 @@ export function fakeBrowser(initialTabs, { focusedWindowId = 1, windows: windowS
     const tab = tabs.find((t) => t.id === id);
     if (!tab) throw new Error(`No tab with id: ${id}.`);
     return tab;
+  };
+
+  /**
+   * Why Chromium won't open `url` from an extension, if it won't (extension_tab_util.cc; the
+   * first two checked in Chromium 156, where one refused address fails a whole `windows.create`).
+   *
+   * @param {string | undefined} url - The address asked for.
+   * @returns {string | undefined} Chromium's error, or undefined when it opens.
+   */
+  const refusal = (url) => {
+    if (url?.startsWith('javascript:')) return 'JavaScript URLs are not allowed in API based extension navigations.';
+    if (url && /^chrome:\/\/(kill|crash|hang|quit|restart)\b/.test(url)) return 'I\'m sorry. I\'m afraid I can\'t do that.';
+    if (url?.startsWith('file:') && !fileAccess) return 'Cannot navigate to a file URL without local file access.';
+    return undefined;
   };
 
   /** @type {Map<number, FakeGroup>} Open groups the extension made, by id. */
@@ -164,9 +192,13 @@ export function fakeBrowser(initialTabs, { focusedWindowId = 1, windows: windowS
   };
 
   const tabsApi = {
-    /** @param {chrome.tabs.QueryInfo} q */
-    async query(q) {
-      return q.active ? snapshot().filter((t) => t.active) : snapshot();
+    /** @param {chrome.tabs.QueryInfo} q - `active`, `windowId`, `lastFocusedWindow` and `windowType` are honoured. */
+    async query({ active, windowId, lastFocusedWindow, windowType }) {
+      return snapshot().filter((t) =>
+        (active === undefined || t.active === active)
+        && (windowId === undefined || t.windowId === windowId)
+        && (!lastFocusedWindow || t.windowId === lastFocused)
+        && (windowType === undefined || openWindows.get(t.windowId)?.type === windowType));
     },
     /** @param {number[]} ids */
     async remove(ids) {
@@ -178,12 +210,14 @@ export function fakeBrowser(initialTabs, { focusedWindowId = 1, windows: windowS
       }
     },
     /** @param {number} id @param {chrome.tabs.UpdateProperties} props */
-    async update(id, { muted, pinned }) {
+    async update(id, { muted, pinned, active }) {
       const tab = tabById(id);
       if (muted !== undefined) {
         tab.mutedInfo = muted ? { muted: true, reason: 'extension', extensionId: EXTENSION_ID } : { muted: false };
       }
       if (pinned !== undefined) tab.pinned = pinned;
+      // One active tab a window.
+      if (active) for (const t of tabs) if (t.windowId === tab.windowId) t.active = t === tab;
       return { ...tab };
     },
     /**
@@ -193,7 +227,8 @@ export function fakeBrowser(initialTabs, { focusedWindowId = 1, windows: windowS
      */
     async create({ windowId, index, url, pinned = false }) {
       if (windowId === undefined || !openWindows.has(windowId)) throw new Error(`No window with id: ${windowId}.`);
-      if (url?.startsWith('javascript:')) throw new Error('JavaScript URLs are not allowed in API based extension navigations.');
+      const refused = refusal(url);
+      if (refused) throw new Error(refused);
       const tab = fakeTab({ id: nextTabId++, windowId, url, pinned });
       const inWindow = tabs.filter((t) => t.windowId === windowId);
       const pinnedCount = inWindow.filter((t) => t.pinned).length;
@@ -337,7 +372,10 @@ export function fakeBrowser(initialTabs, { focusedWindowId = 1, windows: windowS
       const win = openWindows.get(id);
       if (!win) throw new Error(`No window with id: ${id}.`);
       if (state !== undefined) win.state = state;
-      if (focused) for (const [other, w] of openWindows) w.focused = other === id;
+      if (focused) {
+        for (const [other, w] of openWindows) w.focused = other === id;
+        lastFocused = id;
+      }
       return { id, ...win };
     },
     /**
@@ -357,15 +395,34 @@ export function fakeBrowser(initialTabs, { focusedWindowId = 1, windows: windowS
       openWindows.delete(id);
     },
     /**
-     * Like Chrome, bounds can't be given with a state other than normal. Its first tab is active.
+     * Like Chrome: bounds can't be given with a state other than normal, a window placed less
+     * than half on the screen is refused, and so is one any of whose addresses can't be opened.
+     * Its first tab is active.
      *
      * @param {chrome.windows.CreateData} data - The window.
      */
     async create({ url, state = 'normal', focused = true, left, top, width, height }) {
       const bounds = { left, top, width, height };
-      if (state !== 'normal' && Object.values(bounds).some((v) => v !== undefined)) throw new Error('Invalid value for state');
+      const placed = Object.values(bounds).some((v) => v !== undefined);
+      if (state !== 'normal' && placed) throw new Error('Invalid value for state');
+      const refused = [url ?? []].flat().map(refusal).find(Boolean);
+      if (refused) throw new Error(refused);
+      if (left !== undefined || top !== undefined) {
+        // A position: at least half the window must be on the screen (Chrome fills in a size not given).
+        const box = { left: left ?? 0, top: top ?? 0, width: width ?? 1200, height: height ?? 800 };
+        const across = Math.max(0, Math.min(box.left + box.width, SCREEN.width) - Math.max(box.left, 0));
+        const down = Math.max(0, Math.min(box.top + box.height, SCREEN.height) - Math.max(box.top, 0));
+        if (across * down < (box.width * box.height) / 2) throw new Error(OFF_SCREEN);
+      } else {
+        // A size alone is never refused: Chrome puts the window on the screen and fits it there.
+        if (width !== undefined) bounds.width = Math.min(width, SCREEN.width);
+        if (height !== undefined) bounds.height = Math.min(height, SCREEN.height);
+      }
       const id = nextWindowId++;
-      if (focused) for (const w of openWindows.values()) w.focused = false;
+      if (focused) {
+        for (const w of openWindows.values()) w.focused = false;
+        lastFocused = id;
+      }
       openWindows.set(id, fakeWindow({ state, focused, ...Object.fromEntries(Object.entries(bounds).filter(([, v]) => v !== undefined)) }));
       const created = [url ?? 'chrome://newtab/'].flat().map((u, i) => fakeTab({ id: nextTabId++, windowId: id, url: u, active: i === 0 }));
       tabs.push(...created);
@@ -381,6 +438,16 @@ export function fakeBrowser(initialTabs, { focusedWindowId = 1, windows: windowS
     session: storage.session,
     local: storage.local,
     extension: { isAllowedFileSchemeAccess: async () => fileAccess },
+    /** The whole `chrome.storage` (sync and `onChanged` too), for the service worker. */
+    storage,
+    /** Turn “Allow access to file URLs” on or off, as on chrome://extensions. */
+    setFileAccess(/** @type {boolean} */ allowed) {
+      fileAccess = allowed;
+    },
+    /** The window Chrome treats as last focused. */
+    get lastFocusedWindowId() {
+      return lastFocused;
+    },
 
     /**
      * A tab as Chrome would pass it to a menu click.

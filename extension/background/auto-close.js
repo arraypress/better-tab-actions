@@ -76,7 +76,7 @@ export async function closeUnusedTabs({ tabs, session }, settings, now) {
   const chosen = unusedTabs(await tabs.query({ windowType: 'normal' }), settings, now);
   const ids = chosen.flatMap((tab) => tab.id ?? []);
   if (!ids.length) return [];
-  await recordClosed(session, chosen, now, { append: true });
+  await recordClosed(session, chosen, { append: true });
   await tabs.remove(ids);
   return ids;
 }

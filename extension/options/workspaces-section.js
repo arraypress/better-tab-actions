@@ -7,7 +7,7 @@
  *
  * @module options/workspaces-section
  */
-import { askText, byId, createMenu, createToast, moreActionsButton } from '../vendor/extension-kit/index.js';
+import { askText, byId, createMenu, createToast, focusedIn, make, moreActionsButton } from '../vendor/extension-kit/index.js';
 import { browserApis, runAction } from '../shared/actions.js';
 import {
   loadWorkspaces, MAX_NAME_LENGTH, MAX_WORKSPACES, replaceWorkspace, updateWorkspaces, workspaceSummary, WORKSPACES_KEY,
@@ -64,17 +64,10 @@ async function act(workspace, command) {
  * @returns {HTMLLIElement} The row.
  */
 function workspaceRow(workspace) {
-  const row = document.createElement('li');
-  row.className = 'row two-line';
+  const row = make('li', 'row two-line');
   row.dataset.id = workspace.id;
-  const label = document.createElement('span');
-  label.className = 'label';
-  const name = document.createElement('span');
-  name.textContent = workspace.name;
-  const summary = document.createElement('span');
-  summary.className = 'secondary';
-  summary.textContent = workspaceSummary(workspace, Date.now());
-  label.append(name, summary);
+  const label = make('span', 'label');
+  label.append(make('span', '', workspace.name), make('span', 'secondary', workspaceSummary(workspace, Date.now())));
 
   row.append(label, moreActionsButton(workspace.name, {
     onClick: (anchor) => menu.open([
@@ -87,12 +80,26 @@ function workspaceRow(workspace) {
   return row;
 }
 
-/** Show the stored workspaces. */
+/**
+ * Show the stored workspaces. The keyboard focus stays in the list across the redraw: a ⋮ menu
+ * and the Rename dialog hand it back to the row's button, which the redraw replaces. It goes to
+ * the same workspace's new button, or, once that workspace is deleted, to the row now in its
+ * place (the last row after the last), and to the “Reopen tab groups” switch when none is left.
+ */
 async function render() {
   const workspaces = await loadWorkspaces(chrome.storage.local);
+  const focused = focusedIn(list);
+  const rows = /** @type {HTMLElement[]} */ ([...list.children]);
+  const at = focused ? rows.findIndex((row) => row.contains(focused)) : -1;
+  const id = rows[at]?.dataset.id;
+
   list.replaceChildren(...workspaces.map(workspaceRow));
   empty.hidden = workspaces.length > 0;
   full.hidden = workspaces.length < MAX_WORKSPACES;
+  if (at < 0) return;
+  const same = workspaces.findIndex((workspace) => workspace.id === id);
+  const row = list.children[same >= 0 ? same : Math.min(at, workspaces.length - 1)];
+  (row?.querySelector('button') ?? byId('reopenGroups')).focus();
 }
 
 /**

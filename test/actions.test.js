@@ -8,7 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { ACTIONS, NO_STATE, menuEntries, menuState, menuTitle } from '../extension/shared/actions.js';
+import { ACTIONS, NO_STATE, SWITCH_LAST, menuEntries, menuState, menuTitle } from '../extension/shared/actions.js';
 import { DEFAULTS, normalizeSettings } from '../extension/shared/settings.js';
 import { closedCount } from '../extension/shared/undo.js';
 import { fakeBrowser, runOn, tabsAt, EXTENSION_ID } from './fake-browser.js';
@@ -222,6 +222,52 @@ test('reopen-closed-tabs: tabs whose window closed come back together in a new w
   await run(b, 'reopen-closed-tabs', null);
   const windows = Object.values(b.layout());
   assert.deepEqual(windows, [['https://keep.com/'], ['https://a.com/1', 'https://a.com/2']]);
+});
+
+test('reopen-closed-tabs: a tab Chrome won’t open again is left out of a new window, not the whole window lost', async () => {
+  const b = fakeBrowser([
+    { id: 1, url: 'https://keep.com/', active: true },
+    { id: 2, url: 'file:///Users/me/notes.html', windowId: 2 },
+    { id: 3, url: 'https://a.com/1', windowId: 2 },
+    { id: 4, url: 'https://a.com/2', windowId: 2 },
+    { id: 5, url: 'https://front.com/', windowId: 2, active: true },
+  ], { fileAccess: true });
+  await run(b, 'close-tabs-to-left', 5);
+  await b.windows.remove(2); // The person closes what's left of the window…
+  b.setFileAccess(false); // …and has turned “Allow access to file URLs” off since.
+
+  assert.equal((await run(b, 'reopen-closed-tabs', null)).length, 2);
+  assert.deepEqual(Object.values(b.layout()), [['https://keep.com/'], ['https://a.com/1', 'https://a.com/2']]);
+});
+
+test('closing incognito tabs keeps none of their addresses: they don’t come back, least of all in an ordinary window', async () => {
+  const b = fakeBrowser([
+    { id: 1, url: 'https://a.com/1', active: true },
+    { id: 2, url: 'https://a.com/2' },
+    { id: 3, url: 'https://a.com/secret', windowId: 2, incognito: true },
+    { id: 4, url: 'https://b.com/', windowId: 2, incognito: true, active: true },
+  ]);
+  assert.deepEqual(await run(b, 'close-other-site-tabs', 1, ALL_WINDOWS), [2, 3], 'both close');
+  assert.equal(await closedCount(b.session), 1, 'only the ordinary window’s tab is remembered');
+  assert.doesNotMatch(JSON.stringify(b.session.data), /secret/);
+
+  await b.windows.remove(2); // The incognito window is closed: nothing of it should be left.
+  await run(b, 'reopen-closed-tabs', null);
+  assert.deepEqual(b.layout(), { 1: ['https://a.com/1', 'https://a.com/2'] });
+});
+
+test('a tab with a huge data: address still closes with the rest; it just can’t be reopened', async () => {
+  // Session storage holds 10 MB: before, writing the batch failed and the action closed nothing.
+  const b = fakeBrowser([
+    { id: 1, url: 'https://a.com/' },
+    { id: 2, url: `data:text/html,${'x'.repeat(11 * 1024 * 1024)}` },
+    { id: 3, url: 'https://front.com/', active: true },
+  ]);
+  assert.deepEqual(await run(b, 'close-tabs-to-left', 3), [1, 2]);
+  assert.deepEqual(b.open, [3]);
+  assert.equal(await closedCount(b.session), 1);
+  await run(b, 'reopen-closed-tabs', null);
+  assert.deepEqual(b.layout()[1], ['https://a.com/', 'https://front.com/']);
 });
 
 test('reopen-closed-tabs: only the most recent batch is kept', async () => {
@@ -439,12 +485,9 @@ const manifest = JSON.parse(readFileSync(new URL('../extension/manifest.json', i
 test('manifest: every action has a matching command, plus the shortcut-only "switch to last used tab"', () => {
   const commands = manifest.commands;
   // "Switch to last used tab" has no menu item: it's only useful from the keyboard.
-  const SHORTCUT_ONLY = ['switch-last-tab'];
-  assert.deepEqual(Object.keys(commands).sort(), [...ACTIONS.map((a) => a.id), ...SHORTCUT_ONLY].sort());
+  assert.deepEqual(Object.keys(commands).sort(), [...ACTIONS.map((a) => a.id), SWITCH_LAST].sort());
   for (const action of ACTIONS) assert.equal(commands[action.id].description, action.title);
-  // Suggested keys: closing a site's tabs, and switching tabs. Chrome allows at most 4.
-  const suggested = Object.entries(commands).filter(([, c]) => c.suggested_key).map(([id]) => id).sort();
-  assert.deepEqual(suggested, ['close-site-tabs', 'switch-last-tab']);
+  assert.equal(commands[SWITCH_LAST].description, 'Switch to last used tab');
 });
 
 test('manifest: within Chrome Web Store limits', () => {

@@ -14,7 +14,7 @@
  *
  * @module shared/workspaces
  */
-import { mainSite, tabUrl } from './sites.js';
+import { mainSite, MAX_URL, tabUrl } from './sites.js';
 import { plural, shortDate } from './text.js';
 
 /** @import { StorageArea } from '../vendor/extension-kit/settings/storage.js' */
@@ -132,8 +132,6 @@ export const MAX_WORKSPACES = 40;
 export const MAX_TABS = 500;
 /** The most bytes (as stored, JSON) one workspace's tabs take: 40 × 200 KB stays under local's 10 MB. */
 export const MAX_BYTES = 200 * 1024;
-/** Longer addresses (big data: URLs) are skipped. */
-export const MAX_URL = 8192;
 /** Titles are cut to this many characters. */
 export const MAX_TITLE = 200;
 /** The longest name the Rename dialog takes. */
@@ -356,7 +354,8 @@ async function leaveUnloaded(tabs, created) {
 
 /**
  * Put a window in a state. Chromium drops a state set just after tabs are added to a new window
- * (it reads back "normal" a moment later, headed or not), so it's set again until it holds.
+ * (it reads back "normal" a moment later, headed or not), so it's set again until it holds. A
+ * state Chrome refuses leaves the window as it opened.
  *
  * @param {WorkspaceApis['windows']} windows - `chrome.windows`.
  * @param {number} windowId - The window.
@@ -372,9 +371,65 @@ async function setWindowState(windows, windowId, state) {
 }
 
 /**
+ * Open a plan's window where it was saved. Chrome refuses a position that puts less than half
+ * the window on a screen ("Bounds must be at least 50% within visible screen space"): a window
+ * saved on a display that has since been unplugged, or dragged mostly off the screen's edge.
+ * Then the window opens at its size where Chrome puts new windows (a size alone is never
+ * refused: Chrome fits it to the screen; both checked in Chromium 156).
+ *
+ * @param {WorkspaceApis['windows']} windows - `chrome.windows`.
+ * @param {chrome.windows.CreateData} create - The window, with its bounds.
+ * @returns {ReturnType<WorkspaceApis['windows']['create']>} The new window.
+ * @throws {Error} When Chrome won't open the window anywhere (its address is refused).
+ */
+async function createWindow(windows, create) {
+  const { left, top, ...unplaced } = create;
+  if (left === undefined && top === undefined) return windows.create(create);
+  return windows.create(create).catch(() => windows.create(unplaced));
+}
+
+/**
+ * Reopen one window of a workspace.
+ *
+ * @param {Pick<WorkspaceApis, 'tabs' | 'windows' | 'tabGroups'>} apis - The chrome APIs.
+ * @param {WindowPlan} plan - The window's plan.
+ * @returns {Promise<{windowId?: number, tabIds: number[]}>} The window and the tabs opened in it.
+ */
+async function openWindow({ tabs, windows, tabGroups }, plan) {
+  const win = await createWindow(windows, plan.create);
+  const windowId = win?.id;
+  const first = win?.tabs?.[0]?.id;
+  if (windowId === undefined || first === undefined) return { tabIds: [] };
+  if (plan.tabs[plan.active].pinned) await tabs.update(first, { pinned: true });
+
+  /** @type {Promise<number | undefined>[]} */
+  const ids = [];
+  for (const [index, { url, pinned }] of plan.tabs.entries()) {
+    if (index === plan.active) {
+      ids.push(Promise.resolve(first));
+      continue;
+    }
+    // In order: each tab goes at its own index, before the active tab or after the ones made so far.
+    const created = await tabs.create({ windowId, url, index, pinned, active: false }).catch(() => undefined);
+    ids.push(created ? leaveUnloaded(tabs, created) : Promise.resolve(undefined));
+  }
+  const tabIds = await Promise.all(ids);
+
+  for (const group of plan.groups) {
+    const members = group.tabs.flatMap((index) => tabIds[index] ?? []);
+    if (!members.length) continue;
+    const groupId = await tabs.group({ tabIds: /** @type {[number, ...number[]]} */ (members), createProperties: { windowId } });
+    await tabGroups.update(groupId, { title: group.title, color: group.color, collapsed: group.collapsed });
+  }
+  if (plan.state !== 'normal') await setWindowState(windows, windowId, plan.state).catch(() => {});
+  return { windowId, tabIds: tabIds.flatMap((id) => id ?? []) };
+}
+
+/**
  * Reopen a workspace in new windows, keeping tab order, pinned tabs, groups (when asked) and
  * each window's state. Only each window's active tab loads. A tab Chrome refuses to open is
- * left out rather than stopping the rest.
+ * left out rather than stopping the rest, and so is a window that can't be made (or that's
+ * closed while its tabs are still being added).
  *
  * @param {WorkspaceApis} apis - `chrome.tabs`, `chrome.windows` and `chrome.tabGroups`.
  * @param {Workspace} workspace - The workspace.
@@ -382,42 +437,21 @@ async function setWindowState(windows, windowId, state) {
  *   each group it makes to its saved tab groups).
  * @returns {Promise<number[]>} The ids of the tabs opened.
  */
-export async function openWorkspace({ tabs, windows, tabGroups }, workspace, options) {
+export async function openWorkspace(apis, workspace, options) {
   /** @type {number[]} */
   const opened = [];
   /** @type {number | undefined} */
   let focusId;
   for (const plan of reopenPlan(workspace, options)) {
-    const win = await windows.create(plan.create);
-    const windowId = win?.id;
-    const first = win?.tabs?.[0]?.id;
-    if (windowId === undefined || first === undefined) continue;
-    if (plan.tabs[plan.active].pinned) await tabs.update(first, { pinned: true });
-
-    /** @type {Promise<number | undefined>[]} */
-    const ids = [];
-    for (const [index, { url, pinned }] of plan.tabs.entries()) {
-      if (index === plan.active) {
-        ids.push(Promise.resolve(first));
-        continue;
-      }
-      // In order: each tab goes at its own index, before the active tab or after the ones made so far.
-      const created = await tabs.create({ windowId, url, index, pinned, active: false }).catch(() => undefined);
-      ids.push(created ? leaveUnloaded(tabs, created) : Promise.resolve(undefined));
+    try {
+      const { windowId, tabIds } = await openWindow(apis, plan);
+      opened.push(...tabIds);
+      if (plan.focused && plan.state !== 'minimized') focusId = windowId;
+    } catch (error) {
+      console.error('Reopening a window:', error);
     }
-    const tabIds = await Promise.all(ids);
-    opened.push(...tabIds.flatMap((id) => id ?? []));
-
-    for (const group of plan.groups) {
-      const members = group.tabs.flatMap((index) => tabIds[index] ?? []);
-      if (!members.length) continue;
-      const groupId = await tabs.group({ tabIds: /** @type {[number, ...number[]]} */ (members), createProperties: { windowId } });
-      await tabGroups.update(groupId, { title: group.title, color: group.color, collapsed: group.collapsed });
-    }
-    if (plan.state !== 'normal') await setWindowState(windows, windowId, plan.state);
-    if (plan.focused && plan.state !== 'minimized') focusId = windowId;
   }
-  if (focusId !== undefined) await windows.update(focusId, { focused: true });
+  if (focusId !== undefined) await apis.windows.update(focusId, { focused: true }).catch(() => {});
   return opened;
 }
 

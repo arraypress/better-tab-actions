@@ -1,14 +1,18 @@
 /**
- * Wording helpers: counted nouns, short dates and durations.
+ * Wording helpers: nouns in the right number, counted nouns, short dates and durations.
  *
  * @module test/text
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { duration, plural, shortDate } from '../extension/shared/text.js';
+import { duration, noun, plural, shortDate } from '../extension/shared/text.js';
 
 test('plural: singular only for one', () => {
   assert.deepEqual([plural(0, 'tab'), plural(1, 'tab'), plural(2, 'tab')], ['0 tabs', '1 tab', '2 tabs']);
+});
+
+test('noun: the word alone, in the number its count takes (the unit beside a number field)', () => {
+  assert.deepEqual([noun(0, 'day'), noun(1, 'day'), noun(30, 'day')], ['days', 'day', 'days']);
 });
 
 test('shortDate: day and month, with the year only when it differs from now’s', () => {

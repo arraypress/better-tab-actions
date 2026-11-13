@@ -1,7 +1,7 @@
 /**
  * What a tab's address says: the site it belongs to, the page it shows, and
- * the address itself while it's still loading. Shared by the actions and the
- * closed-tab batch. Sites typed into a list, and whether a tab is on one, are
+ * the address itself while it's still loading, and how long an address may
+ * be to be kept. Shared by the actions, the closed-tab batch and workspaces. Sites typed into a list, and whether a tab is on one, are
  * the kit's (`siteHost`, `onSite`).
  *
  * @module shared/sites
@@ -14,6 +14,12 @@
  *
  * @typedef {Omit<chrome.tabs.Tab, 'lastAccessed'> & {lastAccessed?: number}} Tab
  */
+
+/**
+ * The longest address kept for reopening, in a workspace or the closed batch. Longer ones are big
+ * `data:` pages: a few would fill the storage the rest is kept in.
+ */
+export const MAX_URL = 8192;
 
 /**
  * The site a URL belongs to, or null for non-web pages (chrome://, file://, etc.).

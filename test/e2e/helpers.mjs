@@ -1,38 +1,40 @@
 /**
- * What the e2e checks share: made-up sites answered locally (the network edge), counting each
- * request; opening a window of tabs from the service worker; and running an action the way a
- * menu click does.
+ * What the e2e checks share: the test build (extension/ plus the test hook, scripts/build-e2e.mjs)
+ * in a fresh profile, made-up sites answered locally (the network edge) with each request
+ * counted, opening a window of tabs from the service worker, and a menu click or keyboard
+ * shortcut made through the hook.
  *
  * @module test/e2e/helpers
  */
 
 import { chromium } from 'playwright';
 import { fileURLToPath } from 'node:url';
-import { extensionProfile } from '@arraypress/extension-kit/testing';
+import { extensionProfile, testBuildDir } from '@arraypress/extension-kit/testing';
 
 /** @import { BrowserContext, Worker } from 'playwright' */
+/** @import { TestHook } from './hook.js' */
 
 /**
- * The service worker's global scope: the background's `runMenuAction`, what the menu and
- * shortcuts call.
+ * A test build's service worker scope: the hook's handlers.
  *
- * @typedef {typeof globalThis & {
- *   runMenuAction: (id: string, tab?: chrome.tabs.Tab, workspaceId?: string) => Promise<number[]>,
- * }} WorkerScope
+ * @typedef {typeof globalThis & {betterTabActionsTest: TestHook}} HookScope
  */
 
-/** The unpacked extension. */
+const root = fileURLToPath(new URL('../..', import.meta.url));
+/** The unpacked extension, as the store gets it. */
 export const EXTENSION = fileURLToPath(new URL('../../extension', import.meta.url));
+/** The test build: extension/ with the test hook as its service worker (`npm run e2e` builds it first). */
+export const BUILD = testBuildDir(root);
 
 /**
  * A fresh en-GB profile for the extension in Playwright's Chromium, to start once or more (Chrome's
  * saved groups can only be read once it has closed).
  *
  * @param {string} prefix - The temporary profile's name prefix.
- * @param {string} [dir] - The unpacked extension: a test build, say. Default {@link EXTENSION}.
+ * @param {string} [dir] - The unpacked extension. Default {@link BUILD}.
  * @returns {ReturnType<typeof extensionProfile>} The profile.
  */
-export const testProfile = (prefix, dir = EXTENSION) => extensionProfile(chromium, dir, { prefix, locale: 'en-GB' });
+export const testProfile = (prefix, dir = BUILD) => extensionProfile(chromium, dir, { prefix, locale: 'en-GB' });
 
 /**
  * Answer every `https://<name>.example/` page with a small page titled with its host, and count
@@ -74,14 +76,28 @@ export const openWindow = (worker, urls, pin = []) => worker.evaluate(async ({ u
 }, { urls, pin });
 
 /**
- * Run an action exactly as a menu click (with a tab) or a keyboard shortcut (without) does.
+ * Click an item of the tab menu on a tab, through the test hook: exactly what Chrome's
+ * `contextMenus.onClicked` listener calls.
  *
- * @param {Worker} worker - The extension's service worker.
- * @param {string} id - The action.
- * @param {number} [tabId] - The clicked tab.
- * @param {string} [workspaceId] - For "open-workspace", the submenu item's workspace.
+ * @param {Worker} worker - A test build's service worker.
+ * @param {string} menuItemId - The item: an action, `open-workspace:<id>` or `manage-workspaces`.
+ * @param {number} tabId - The right-clicked tab.
  * @returns {Promise<number[]>} What the action acted on.
  */
-export const click = (worker, id, tabId, workspaceId) => worker.evaluate(async ({ id, tabId, workspaceId }) =>
-  /** @type {WorkerScope} */ (globalThis).runMenuAction(id, tabId === undefined ? undefined : await chrome.tabs.get(tabId), workspaceId),
-{ id, tabId, workspaceId });
+export const click = (worker, menuItemId, tabId) => worker.evaluate(async ({ menuItemId, tabId }) =>
+  /** @type {HookScope} */ (globalThis).betterTabActionsTest.click({ menuItemId }, await chrome.tabs.get(tabId)),
+{ menuItemId, tabId });
+
+/**
+ * Press a command's keyboard shortcut, through the test hook: exactly what Chrome's
+ * `commands.onCommand` listener calls, with the tab Chrome names (the active one).
+ *
+ * @param {Worker} worker - A test build's service worker.
+ * @param {string} command - The command's name in the manifest.
+ * @param {number} [tabId] - The tab in front. Default: the last focused window's active tab.
+ * @returns {Promise<number[]>} What the action acted on.
+ */
+export const press = (worker, command, tabId) => worker.evaluate(async ({ command, tabId }) => {
+  const tab = tabId === undefined ? (await chrome.tabs.query({ active: true, lastFocusedWindow: true }))[0] : await chrome.tabs.get(tabId);
+  return /** @type {HookScope} */ (globalThis).betterTabActionsTest.command(command, tab);
+}, { command, tabId });

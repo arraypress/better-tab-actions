@@ -1,7 +1,7 @@
 /**
- * Real-browser check of the two group actions: loads extension/ as an unpacked extension in
- * Playwright's Chromium and runs the actions through the background's own handler (`runMenuAction`, what the menu
- * and shortcuts call), so the real chrome.tabs / chrome.tabGroups / chrome.windows do the work.
+ * Real-browser check of the two group actions: the test build in Playwright's Chromium, the
+ * actions run as a click in the tab menu runs them (the test hook), so the real chrome.tabs /
+ * chrome.tabGroups / chrome.windows do the work.
  *
  *   npm run e2e
  *
@@ -12,19 +12,21 @@
  * @module test/e2e/groups
  */
 import assert from 'node:assert/strict';
+import { checkRunner, runChecks, savedTabGroups } from '@arraypress/extension-kit/testing';
 import { click as clickOn, openWindow as openIn, serveExampleSites, testProfile } from './helpers.mjs';
-import { savedTabGroups } from '@arraypress/extension-kit/testing';
 
 /**
  * The service worker's global scope, with the groups this check saw Chrome update.
  *
- * @typedef {import('./helpers.mjs').WorkerScope & {seenGroups: {windowId: number, title?: string}[]}} WorkerScope
+ * @typedef {typeof globalThis & {seenGroups: {windowId: number, title?: string}[]}} WorkerScope
  */
 
-const profile = await testProfile('mta-e2e-');
+const profile = await testProfile('bta-groups-');
 const { context, worker, close } = await profile.launch();
+const runner = checkRunner();
+const { check } = runner;
 
-try {
+await runChecks(runner, async () => {
   // Made-up sites, answered locally (the network edge).
   await serveExampleSites(context);
   /** @param {string[]} urls @param {number[]} [pin] */
@@ -46,8 +48,7 @@ try {
     };
   }, windowId);
 
-  // 1. "Save this window as a group": 4 tabs, 2 on one site, in a window that isn't focused.
-  {
+  await check('save-window-as-group: one group, named after the main site, with the 4 tabs of a window that isn’t focused', async () => {
     const urls = ['https://github.example/a', 'https://news.example/', 'https://github.example/b', 'https://docs.example/'];
     const { windowId, tabIds } = await openWindow(urls);
     const grouped = await click('save-window-as-group', tabIds[1]);
@@ -56,11 +57,9 @@ try {
     // Run again: nothing left to group, so nothing changes.
     assert.deepEqual(await click('save-window-as-group', tabIds[0]), []);
     assert.equal((await windowState(windowId)).groups.length, 1);
-    console.log('✔ save-window-as-group: one group, named github.example, with the window’s 4 tabs');
-  }
+  });
 
-  // 2. Pinned tabs stay pinned and out of the group; "Close window and keep as group" won't close it.
-  {
+  await check('a pinned tab stays pinned and out of the group (named by date on a tie); “Close window and keep as group” declines while it’s there', async () => {
     const urls = ['https://mail.example/', 'https://a.example/', 'https://b.example/'];
     const { windowId, tabIds } = await openWindow(urls, [0]);
     assert.deepEqual(await click('close-window-keep-group', tabIds[1]), []);
@@ -69,11 +68,9 @@ try {
     const state = await windowState(windowId);
     assert.deepEqual(state.ungrouped, ['pinned https://mail.example/']);
     assert.equal(state.groups[0].title, new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' }).format(new Date()));
-    console.log(`✔ pinned tab left alone; tie named by date (“${state.groups[0].title}”); close action declined while pinned`);
-  }
+  });
 
-  // 3. "Close window and keep as group": the group is made and named, then the window closes.
-  {
+  await check('close-window-keep-group: the group is made and named “shop.example”, then the window closes', async () => {
     const urls = ['https://shop.example/1', 'https://shop.example/2', 'https://c.example/'];
     const { windowId, tabIds } = await openWindow(urls);
     await worker.evaluate(() => {
@@ -86,15 +83,11 @@ try {
     assert.ok(!windows.includes(windowId), 'the window is closed');
     const seen = await worker.evaluate(() => /** @type {WorkerScope} */ (globalThis).seenGroups);
     assert.ok(seen.some((g) => g.windowId === windowId && g.title === 'shop.example'), `group named before closing: ${JSON.stringify(seen)}`);
-    console.log('✔ close-window-keep-group: grouped as “shop.example”, then the window closed');
-  }
+  });
 
-  // 4. Chrome keeps the closed window's group in its saved groups (read from the closed profile).
-  await close();
-  const shop = (await savedTabGroups(profile.dir)).filter((g) => g.title === 'shop.example');
-  assert.deepEqual(shop.map((g) => g.urls), [['https://shop.example/1', 'https://shop.example/2', 'https://c.example/']]);
-  console.log('✔ Chrome keeps “shop.example” in its saved tab groups after the window closed');
-} finally {
-  await close().catch(() => {});
-  await profile.remove();
-}
+  await check('Chrome keeps “shop.example” in its saved tab groups after the window closed (read from the closed profile)', async () => {
+    await close();
+    const shop = (await savedTabGroups(profile.dir)).filter((g) => g.title === 'shop.example');
+    assert.deepEqual(shop.map((g) => g.urls), [['https://shop.example/1', 'https://shop.example/2', 'https://c.example/']]);
+  });
+}, [() => close().catch(() => {}), profile.remove]);

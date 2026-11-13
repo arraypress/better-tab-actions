@@ -9,12 +9,11 @@
  * @module test/e2e/toolbar
  */
 import { chromium } from 'playwright';
-import { fileURLToPath } from 'node:url';
 import { checkToolbarTheme, launchExtension } from '@arraypress/extension-kit/testing';
 import { toolbarIcon } from '../../extension/vendor/extension-kit/index.js';
+import { EXTENSION } from './helpers.mjs';
 
-const extension = fileURLToPath(new URL('../../extension', import.meta.url));
-const launched = await launchExtension(chromium, extension, { prefix: 'mta-toolbar-' });
+const launched = await launchExtension(chromium, EXTENSION, { prefix: 'bta-toolbar-' });
 try {
   const options = {
     path: 'options/options.html',

@@ -80,6 +80,8 @@ import { loadWorkspaces, MAX_WORKSPACES, MENU_WORKSPACES, openWorkspace, saveWor
  *   | {separator: true, id?: undefined, title?: undefined, enabled?: undefined, children?: undefined}} MenuEntry
  */
 
+/** The command "Switch to last used tab": a keyboard shortcut only, with no menu item (background/worker.js runs it). */
+export const SWITCH_LAST = 'switch-last-tab';
 /** How the "Open workspace" submenu names one workspace's item: this, then the workspace's id. */
 export const WORKSPACE_ITEM_PREFIX = 'open-workspace:';
 /** The "Open workspace" submenu's last item, to the settings page's Workspaces card. */
@@ -595,7 +597,7 @@ export async function runAction(
 
   if (plan.effect === 'close') {
     const chosen = new Set(plan.ids);
-    await recordClosed(browser.session, tabs.filter((tab) => tab.id !== undefined && chosen.has(tab.id)), now);
+    await recordClosed(browser.session, tabs.filter((tab) => tab.id !== undefined && chosen.has(tab.id)));
     await browser.tabs.remove(plan.ids);
   } else if (plan.effect === 'move') {
     // In order: each move assumes the ones before it have happened.

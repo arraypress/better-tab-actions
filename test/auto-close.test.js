@@ -10,9 +10,9 @@ import { AUTO_CLOSE_ALARM, CHECK_MINUTES, closeUnusedTabs, HOUR_MS, scheduleAuto
 import { normalizeSettings } from '../extension/shared/settings.js';
 import { closedCount, MAX_CLOSED, recordClosed } from '../extension/shared/undo.js';
 import { fakeBrowser, runOn } from './fake-browser.js';
+import { fakeAlarms } from './fake-chrome.js';
 
 /** @import { Settings } from '../extension/shared/settings.js' */
-/** @import { AlarmsApi } from '../extension/background/auto-close.js' */
 
 const NOW = Date.UTC(2026, 10, 9, 12);
 const OLD = NOW - 5 * HOUR_MS;
@@ -84,39 +84,12 @@ test('closeUnusedTabs: closed tabs join the “Reopen closed tabs” batch, and 
 test('recordClosed: appending keeps the earlier tabs, up to MAX_CLOSED, newest kept', async () => {
   const b = fakeBrowser(Array.from({ length: MAX_CLOSED + 3 }, (_, i) => ({ id: i + 1, url: `https://t${i}.com/` })));
   const tabs = await b.tabs.query({});
-  await recordClosed(b.session, tabs.slice(0, 3), NOW);
-  await recordClosed(b.session, tabs.slice(3), NOW, { append: true });
+  await recordClosed(b.session, tabs.slice(0, 3));
+  await recordClosed(b.session, tabs.slice(3), { append: true });
   assert.equal(await closedCount(b.session), MAX_CLOSED);
-  await recordClosed(b.session, tabs.slice(0, 2), NOW);
+  await recordClosed(b.session, tabs.slice(0, 2));
   assert.equal(await closedCount(b.session), 2, 'a menu action starts a new batch');
 });
-
-/**
- * An in-memory chrome.alarms: the alarms by name.
- *
- * @returns {AlarmsApi & {all: Map<string, chrome.alarms.Alarm>, readonly creates: number}} The fake.
- */
-function fakeAlarms() {
-  /** @type {Map<string, chrome.alarms.Alarm>} */
-  const all = new Map();
-  let creates = 0;
-  return {
-    all,
-    get creates() {
-      return creates;
-    },
-    async get(name) {
-      return all.get(name);
-    },
-    async create(name, { periodInMinutes, delayInMinutes = 0 }) {
-      creates++;
-      all.set(name, { name, periodInMinutes, scheduledTime: NOW + delayInMinutes * 60_000, persistAcrossSessions: true });
-    },
-    async clear(name) {
-      return all.delete(name);
-    },
-  };
-}
 
 test('scheduleAutoClose: an alarm every CHECK_MINUTES while on, left alone when the worker wakes, none while off', async () => {
   const alarms = fakeAlarms();

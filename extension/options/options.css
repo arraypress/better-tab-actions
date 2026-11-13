@@ -2,4 +2,5 @@
    card and the "Saved" indicator included; only what this page adds is here. */
 
 .days { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; color: var(--text-secondary); }
-#inactiveDays { width: 72px; text-align: right; }
+/* `end`, not `right`: the number sits beside its unit on a right-to-left page too. */
+#inactiveDays { width: 72px; text-align: end; }
