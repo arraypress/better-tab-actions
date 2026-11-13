@@ -92,7 +92,8 @@ export function startWorker(api) {
 
   /** Start or stop the automatic-closing alarm to match the settings. */
   async function schedule() {
-    await scheduleAutoClose(api.alarms, await settingsStore.load(api.storage)).catch(logFailure('Scheduling automatic closing'));
+    await scheduleAutoClose({ alarms: api.alarms, local: api.storage.local }, await settingsStore.load(api.storage), Date.now())
+      .catch(logFailure('Scheduling automatic closing'));
   }
 
   /**

@@ -149,8 +149,8 @@ What real Chromium does (checked with Playwright's Chromium 156, `test/e2e/works
 ## Close unused tabs automatically
 `background/auto-close.js`: an alarm (`close-unused-tabs`, every `CHECK_MINUTES` = 5) while `autoClose` is on
 closes tabs `unused()` (shared with "Close tabs not used in N days" in `shared/actions.js`) for `autoCloseHours`
-(1, 4, 12, 24, 72, 168; `AUTO_CLOSE_HOURS` in settings.js), in normal windows, never incognito, never on
-`keepSites` (or their subdomains). Closed tabs are *appended* to the undo batch (`recordClosed(..., {append: true})`,
+(1, 4, 12, 24, 72, 168; `AUTO_CLOSE_HOURS` in settings.js) of running, awake Chrome (the awake clock, below),
+in normal windows, never incognito, never on `keepSites` (or their subdomains). Closed tabs are *appended* to the undo batch (`recordClosed(..., {append: true})`,
 capped at 500) so earlier automatic closes stay reopenable; a menu action still starts a new batch. Sites are
 typed into the kit's one-field dialog and listed by its `createSiteList` (Add button, ⋮ Edit/Remove; `siteHost` keeps
 hosts, `onSite` matches subdomains), as chrome://settings/performance lists Memory Saver's sites; the list is cut to fit one sync item. Memory Saver is
@@ -164,8 +164,21 @@ only linked, never reimplemented.
   where `HOUR_MS` is a second and `CHECK_MINUTES` 0.02; unpacked extensions may set alarms that short.
 - **The alarm's lifetime.** From Chrome 150 an alarm persists until the extension updates
   (`persistAcrossSessions`, true by default; read back in Chromium 156), so scheduling on install, on browser
-  start and on a settings change is enough. A missed alarm fires once when the computer wakes, and
-  `lastAccessed` is wall-clock time: tabs left overnight count as unused for the night.
+  start and on a settings change is enough.
+- **The awake clock** (David, 13 Nov 2026: a night's sleep must not close everything). Chrome's docs: "Alarms
+  continue to run while a device is sleeping. However, an alarm will not wake up a device. When the device
+  wakes up, any missed alarms will fire. Repeating alarms will fire at most once and then be rescheduled";
+  they say nothing of an alarm that fell due while Chrome was closed. `tab.lastAccessed` is wall-clock time.
+  So each check ticks an `AwakeClock` in `chrome.storage.local` (`awakeClock`: `since`, `tick`, `away`; local
+  because it must outlive Chrome being closed): a tick more than two periods after the last (`GAP_MS`) makes
+  the time between an away stretch, and `awakeTime` takes away stretches off a tab's idle time. Time before
+  the setting was turned on counts as away (nothing was watching), so nothing closes until the chosen time
+  has passed, awake, since then. Turning it off deletes the clock. At most 200 stretches (`MAX_AWAY`); older
+  ones fold into `since`, which only keeps tabs longer. `chrome.idle` isn't used: it reports a locked screen,
+  not sleep, nothing while Chrome is closed, and would add a permission. The menu's "Close tabs not used in
+  N days" is asked for by hand and still goes by `lastAccessed` alone. Tested with the time each check is
+  given (`test/auto-close.test.js`), and in Chromium by taking the alarm away for longer than the chosen
+  time and by quitting and starting Chrome (`test/e2e/auto-close.mjs`).
 
 ## Design
 - The options page copies chrome://settings. Its look comes from `chrome-ui.css` in `@arraypress/extension-kit`

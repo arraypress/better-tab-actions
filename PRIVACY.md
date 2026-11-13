@@ -26,6 +26,9 @@ kept by Chrome itself, in your saved tab groups, like the groups you make yourse
   never among them.
 - **Which tabs you used most recently** (Chrome’s numbers for them, not their addresses), on this
   computer only, so “Switch to last used tab” knows where to go back to.
+- **When Chrome wasn’t running or your computer was asleep**, while automatic closing is on (the
+  times only), on this computer only, so that time doesn’t count towards closing a tab. It’s
+  deleted when you turn automatic closing off.
 - **Whether Chrome is in light or dark mode**, on this computer only, to draw its toolbar icon in
   the right colour.
 

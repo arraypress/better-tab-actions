@@ -18,8 +18,10 @@ First version.
   Chrome puts new windows. Commands for save windows, save this window and open the last workspace.
 - **Close unused tabs automatically** (off by default): tabs not used for 1, 4 or 12 hours, 1 or 3
   days, or 1 week are closed every few minutes (`chrome.alarms`, no install warning) and join
-  “Reopen closed tabs”. Keeps each window’s current tab, pinned, playing, incognito and (if set)
-  grouped tabs, and a “Never close tabs from these sites” list. Links to Chrome’s Memory Saver.
+  “Reopen closed tabs”. Only time Chrome is open and the computer awake counts, from when it’s
+  turned on: a night asleep, or a day with Chrome closed, closes nothing. Keeps each window’s
+  current tab, pinned, playing, incognito and (if set) grouped tabs, and a “Never close tabs from
+  these sites” list. Links to Chrome’s Memory Saver.
 - **Switch to last used tab**, across windows: a keyboard shortcut only.
 - **No default keyboard shortcuts.** Every action, and “Switch to last used tab”, is a command you
   can give a key at chrome://extensions/shortcuts; the settings page lists the keys you’ve set.

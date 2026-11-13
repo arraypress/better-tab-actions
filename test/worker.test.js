@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { until } from '@arraypress/extension-kit/testing';
 import { ACTIONS, menuEntries, SWITCH_LAST } from '../extension/shared/actions.js';
-import { AUTO_CLOSE_ALARM, CHECK_MINUTES, HOUR_MS } from '../extension/background/auto-close.js';
+import { AUTO_CLOSE_ALARM, AWAKE_KEY, CHECK_MINUTES, HOUR_MS } from '../extension/background/auto-close.js';
 import { menuItems, PARENT_ID, REFRESH_MS } from '../extension/background/menu.js';
 import { startWorker, WORKSPACES_PAGE } from '../extension/background/worker.js';
 import { RECENT_KEY } from '../extension/background/recent.js';
@@ -219,12 +219,18 @@ test('automatic closing: the alarm follows the setting, and each alarm closes th
 
   await chrome.api.storage.sync.set(normalizeSettings({ autoClose: true, autoCloseHours: 4 }));
   await until(() => chrome.alarms.all.get(AUTO_CLOSE_ALARM)?.periodInMinutes === CHECK_MINUTES, 'the alarm');
+  // Turned on just now: nothing has gone unused for four hours of watching yet.
+  await chrome.alarms.onAlarm.fire(/** @type {chrome.alarms.Alarm} */ (chrome.alarms.all.get(AUTO_CLOSE_ALARM)));
+  assert.deepEqual(chrome.browser.open, [1, 2, 3]);
+  // As if it had been on, with Chrome running, since before the tabs were last used.
+  await chrome.api.storage.local.set({ [AWAKE_KEY]: { since: old - HOUR_MS, tick: Date.now(), away: [] } });
   await chrome.alarms.onAlarm.fire(/** @type {chrome.alarms.Alarm} */ (chrome.alarms.all.get(AUTO_CLOSE_ALARM)));
   assert.deepEqual(chrome.browser.open, [1, 3]);
   await until(() => chrome.contextMenus.shows('reopen-closed-tabs') === 'Reopen 1 closed tab', 'the label');
 
   await chrome.api.storage.sync.set({ autoClose: false });
   await until(() => chrome.alarms.all.size === 0, 'the alarm to be cleared');
+  await until(async () => !(AWAKE_KEY in await chrome.api.storage.local.get(AWAKE_KEY)), 'the clock to go');
 });
 
 test('the toolbar button opens the settings page', async () => {

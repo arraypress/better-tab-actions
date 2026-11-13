@@ -26,7 +26,8 @@ Right-click any tab → **More tab actions**:
 | Open workspace › | Reopens a saved workspace; tabs load when you click them |
 
 - **Close unused tabs automatically** (off until you turn it on): closes tabs you haven’t used for
-  the time you pick. They can be reopened with “Reopen closed tabs”.
+  the time you pick, counting only time Chrome is open and your computer is awake, from when you
+  turn it on. They can be reopened with “Reopen closed tabs”.
 - **Keyboard**: every action can have a shortcut, and so can “Switch to last used tab”, which goes
   back to the tab you were just on, even in another window. None is set to begin with: choose
   your own at chrome://extensions/shortcuts.

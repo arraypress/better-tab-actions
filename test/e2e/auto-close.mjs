@@ -5,10 +5,14 @@
  *
  * 1. `alarms` adds no install warning: Chrome's own warnings for the manifest, with and without it.
  * 2. With the setting on, unused tabs close; the active, pinned, grouped (with grouped tabs left
- *    alone) and never-close-site tabs stay; turning
- *    it off clears the alarm; "Reopen closed tabs" brings the closed ones back in their places.
- * 3. The settings page: the switch shows the age list and the site list; Add (refusing what isn't
+ *    alone) and never-close-site tabs stay.
+ * 3. Only time Chrome was running and awake counts: with no check for longer than the chosen time
+ *    (the alarm taken away and put back, as it's silent while the computer sleeps), a tab stays
+ *    until it has gone unused that long awake.
+ * 4. Turning it off clears the alarm; "Reopen closed tabs" brings the closed ones back in their places.
+ * 5. The settings page: the switch shows the age list and the site list; Add (refusing what isn't
  *    a site), Edit and Remove; the Memory Saver row opens chrome://settings/performance.
+ * 6. Chrome closed and started again: the time it was closed is kept as away time.
  *
  *   npm run e2e
  *
@@ -22,6 +26,7 @@ import { buildE2e } from '../../scripts/build-e2e.mjs';
 import { click, EXTENSION, openWindow, serveExampleSites, testProfile } from './helpers.mjs';
 
 /** @import { Worker } from 'playwright' */
+/** @import { AwakeClock } from '../../extension/background/auto-close.js' */
 
 const build = await buildE2e('auto-close');
 const moduleFile = path.join(build, 'background', 'auto-close.js');
@@ -33,7 +38,10 @@ assert.equal(fast.split('\n').filter((line, i) => line !== source.split('\n')[i]
 await writeFile(moduleFile, fast);
 
 const profile = await testProfile('bta-auto-close-', build);
-const { worker, context, url, close } = await profile.launch();
+const first = await profile.launch();
+const { worker, context, url } = first;
+/** Closes the browser that's open now (a later check starts Chrome again). */
+let close = first.close;
 const runner = checkRunner();
 const { check } = runner;
 
@@ -70,11 +78,47 @@ await runChecks(runner, async () => {
     assert.deepEqual(await strip(worker, windowId), [urls[0], urls[2], urls[3], urls[5]]);
   });
 
+  /**
+   * The awake clock as stored.
+   *
+   * @param {Worker} w - The service worker.
+   * @returns {Promise<AwakeClock | undefined>} The clock.
+   */
+  const clock = (w) => w.evaluate(async () => /** @type {AwakeClock | undefined} */ ((await chrome.storage.local.get('awakeClock')).awakeClock));
+
+  await check('asleep for longer than the chosen time (no check fires): the tab is still there on waking, and closes only after that long awake', async () => {
+    await worker.evaluate(() => chrome.storage.sync.set({ autoCloseHours: 4 })); // Four “hours”: four seconds here.
+    const later = await worker.evaluate(async (windowId) => (await chrome.tabs.create({ windowId, url: 'https://later.example/', active: false })).id, windowId);
+    /** Whether the tab is still open. */
+    const open = () => worker.evaluate((id) => chrome.tabs.get(id ?? -1).then(() => true, () => false), later);
+    const before = (await clock(worker))?.away.length ?? 0;
+    // The lid shuts: no alarm fires. Six seconds later it opens, and the missed alarm fires once.
+    const alarm = await worker.evaluate(async () => {
+      const alarm = await chrome.alarms.get('close-unused-tabs');
+      await chrome.alarms.clear('close-unused-tabs');
+      return alarm;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 6000));
+    assert.equal(await open(), true);
+    const woke = Date.now();
+    await worker.evaluate((period) => chrome.alarms.create('close-unused-tabs', { when: Date.now(), periodInMinutes: period }), alarm?.periodInMinutes);
+    const [left, back] = await until(async () => {
+      const stretches = (await clock(worker))?.away ?? [];
+      return stretches.length > before && stretches.at(-1);
+    }, 'the first check after waking');
+    assert.ok(back - left >= 5000, `the sleep is kept as away time: ${back - left} ms`);
+    assert.equal(await open(), true, 'unused for six seconds by the wall clock, but not for four of them awake');
+    await until(async () => !(await open()), 'the tab to close', 30_000);
+    assert.ok(Date.now() - woke >= 3000, `closed ${Date.now() - woke} ms after waking, not at once`);
+    await worker.evaluate(() => chrome.storage.sync.set({ autoCloseHours: 1 }));
+  });
+
   await check('off: the alarm stops; Reopen closed tabs puts the closed tabs back in their places', async () => {
     await worker.evaluate(() => chrome.storage.sync.set({ autoClose: false }));
     await until(() => worker.evaluate(async () => !(await chrome.alarms.get('close-unused-tabs'))), 'the alarm to stop');
     await click(worker, 'reopen-closed-tabs', tabIds[5]);
-    await until(async () => (await strip(worker, windowId)).join() === urls.join(), 'the closed tabs back in their places');
+    await until(async () => (await strip(worker, windowId)).join() === [...urls.slice(0, 4), 'https://later.example/', ...urls.slice(4)].join(), 'the closed tabs back in their places');
+    assert.equal(await clock(worker), undefined, 'no clock is kept while it’s off');
   });
 
   const page = await context.newPage();
@@ -119,4 +163,20 @@ await runChecks(runner, async () => {
     await page.getByRole('button', { name: /^Memory Saver/ }).click();
     assert.equal((await opened).url(), 'chrome://settings/performance');
   });
-}, [close, profile.remove, () => rm(build, { recursive: true, force: true })]);
+
+  await check('Chrome closed and started again: the time it was closed is kept as away time, so it won’t count', async () => {
+    // The settings page left automatic closing on; wait for a check, then quit Chrome.
+    const { tick } = await until(() => clock(worker), 'the clock');
+    await until(async () => ((await clock(worker))?.tick ?? 0) > tick, 'a check');
+    const quit = Date.now();
+    await close();
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+    const second = await profile.launch();
+    close = second.close;
+    const away = await until(async () => {
+      const stretch = (await clock(second.worker))?.away.at(-1);
+      return stretch && stretch[1] > quit + 5000 && stretch;
+    }, 'the first check after Chrome started', 30_000);
+    assert.ok(away[0] <= quit && away[1] - away[0] >= 5000, `from before it quit to after it started: ${JSON.stringify(away)}, quit at ${quit}`);
+  });
+}, [() => close(), profile.remove, () => rm(build, { recursive: true, force: true })]);
