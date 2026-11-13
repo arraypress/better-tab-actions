@@ -5,10 +5,11 @@ Better Tab Actions works entirely in Chrome on your computer. It collects nothin
 ## What it reads
 
 When you choose one of its actions or shortcuts (and, with automatic closing on, every few
-minutes), it looks at your open tabs’ addresses, titles and last-used times, inside Chrome, so it can close, sort, mute, group, switch to or reopen the right
-tabs, and when you save a workspace, the open windows and their tab groups. Tab groups it makes
-(including those it reopens from a workspace) are kept by Chrome itself, in your saved tab
-groups, like the groups you make yourself.
+minutes), it looks at your open tabs’ addresses, titles and last-used times, inside Chrome, so it
+can close, sort, mute, group, switch to or reopen the right tabs, and when you save a workspace,
+the open windows and their tab groups. To keep its menu right (“Unmute tabs”, or nothing left to
+group), it also looks at which tabs are muted, pinned or in groups as tabs change. Tab groups it makes (including those it reopens from a workspace) are
+kept by Chrome itself, in your saved tab groups, like the groups you make yourself.
 
 ## What it keeps
 
@@ -21,9 +22,10 @@ groups, like the groups you make yourself.
   They are kept on this computer only, in Chrome’s local extension storage: never synced, never
   sent anywhere. Delete one on the settings page, or remove the extension, and it’s gone.
 - **The last tabs it closed**, on this computer only, so “Reopen closed tabs” can bring them back
-  (with automatic closing on, the tabs it closed by itself are added to them).
-- **The tabs you used most recently**, on this computer only, so “Switch to last used tab” knows
-  where to go back to.
+  (with automatic closing on, the tabs it closed by itself are added to them). Incognito tabs are
+  never among them.
+- **Which tabs you used most recently** (Chrome’s numbers for them, not their addresses), on this
+  computer only, so “Switch to last used tab” knows where to go back to.
 - **Whether Chrome is in light or dark mode**, on this computer only, to draw its toolbar icon in
   the right colour.
 

@@ -14,13 +14,19 @@ First version.
   can be opened, renamed, replaced with the current windows or deleted (with Undo). Only each
   window’s active tab loads; the others load when clicked. Kept on this computer only, never
   synced; up to 40 workspaces of up to 500 tabs. **Reopen tab groups** setting, as Chrome saves
-  every group it reopens. Shortcuts (no keys set): save windows, save this window, open the last
-  workspace.
+  every group it reopens. A window saved on a display that’s since been unplugged opens where
+  Chrome puts new windows. Commands for save windows, save this window and open the last workspace.
 - **Close unused tabs automatically** (off by default): tabs not used for 1, 4 or 12 hours, 1 or 3
   days, or 1 week are closed every few minutes (`chrome.alarms`, no install warning) and join
   “Reopen closed tabs”. Keeps each window’s current tab, pinned, playing, incognito and (if set)
   grouped tabs, and a “Never close tabs from these sites” list. Links to Chrome’s Memory Saver.
-- **Switch to last used tab** (Alt+Shift+Z), across windows.
-- Keyboard shortcuts for every action; choose which actions show in the menu.
+- **Switch to last used tab**, across windows: a keyboard shortcut only.
+- **No default keyboard shortcuts.** Every action, and “Switch to last used tab”, is a command you
+  can give a key at chrome://extensions/shortcuts; the settings page lists the keys you’ve set.
+  (Alt+Shift+letter, the usual default, types a character on a Mac and switches the keyboard’s
+  language on Windows.)
+- Choose which actions show in the menu.
+- Incognito tabs an action closes aren’t kept for “Reopen closed tabs”, as Chrome keeps no closed
+  tabs for incognito windows.
 - Settings sync through Chrome Sync; settings page styled like chrome://settings, with an About card.
 - Toolbar icon drawn in Chrome’s own icon colours, light and dark.

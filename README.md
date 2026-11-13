@@ -27,8 +27,9 @@ Right-click any tab → **More tab actions**:
 
 - **Close unused tabs automatically** (off until you turn it on): closes tabs you haven’t used for
   the time you pick. They can be reopened with “Reopen closed tabs”.
-- **Keyboard**: Alt+Shift+Z (⌥⇧Z) switches to the last tab you used; Alt+Shift+W (⌥⇧W) closes tabs
-  from this site. Set others at chrome://extensions/shortcuts.
+- **Keyboard**: every action can have a shortcut, and so can “Switch to last used tab”, which goes
+  back to the tab you were just on, even in another window. None is set to begin with: choose
+  your own at chrome://extensions/shortcuts.
 - **Settings** (click the toolbar icon): which actions show, which windows they work on, and your
   workspaces.
 
@@ -36,6 +37,8 @@ Right-click any tab → **More tab actions**:
 
 - Pinned tabs are never closed. Automatic closing also skips each window’s current tab, tabs
   playing sound, incognito tabs and the sites you list.
+- Incognito tabs an action closes aren’t kept for “Reopen closed tabs”, as Chrome keeps no closed
+  tabs for incognito windows.
 - Chrome doesn’t tell extensions which tabs are using your camera or microphone, so add a call’s
   site to the “never close” list.
 - Settings sync through Chrome Sync; workspaces stay on this computer.
@@ -73,7 +76,7 @@ Needs Chrome 150 or later (that’s when Chrome let extensions add to the tab me
 ```sh
 npm install          # Playwright, ESLint, TypeScript; copies the kit into extension/vendor/
 npm test             # lint, type-check (tsc on the JSDoc types), unit tests (node --test), copied-code check
-npm run e2e          # browser tests in Playwright's Chromium
+npm run e2e          # builds .test-builds/e2e, then browser tests in Playwright's Chromium
 npm run package      # tests, then release/better-tab-actions.zip for the Chrome Web Store
 ```
 
