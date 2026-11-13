@@ -80,7 +80,7 @@ only linked, never reimplemented.
   link rows (the kit's `.about-product` and `.product-title`).
 
 ## Wording
-Tabby's rules (`../Extensions/tabby/CLAUDE.md`, "Wording"): Chrome's own words, sentence case, curly
+Tabby's rules (`../tabby/CLAUDE.md`, "Wording"): Chrome's own words, sentence case, curly
 quotes and apostrophes, "…" only when something asks for more input.
 - The extension was called More Tab Actions until 10 Nov 2026 (renamed for the Better family). The tab menu's
   submenu stays “More tab actions”, as Chrome words its own “More …” entries; `PARENT_ID` stays `more-tab-actions`.
