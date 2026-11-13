@@ -8,7 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { ACTIONS, NO_STATE, SWITCH_LAST, SWITCH_LAST_MESSAGE, menuEntries, menuState, menuTitle } from '../extension/shared/actions.js';
+import { ACTIONS, GROUPS, NO_STATE, SWITCH_LAST, SWITCH_LAST_MESSAGE, menuEntries, menuState, menuTitle } from '../extension/shared/actions.js';
 import { DEFAULTS, normalizeSettings } from '../extension/shared/settings.js';
 import { closedCount } from '../extension/shared/undo.js';
 import { fakeBrowser, runOn, tabsAt, EXTENSION_ID } from './fake-browser.js';
@@ -453,45 +453,94 @@ test('unknown action does nothing', async () => {
 
 // --- Menu ---
 
-test('menuEntries: all actions by default: close actions, sort/mute, the group actions, then workspaces, with separators between', () => {
-  assert.deepEqual(
-    menuEntries(WORDS).map((e) => (e.separator ? '---' : e.title)),
-    [
-      'Close tabs from this site',
-      'Close other tabs from this site',
-      'Close duplicate tabs',
-      'Close tabs not used in 7 days',
-      'Close tabs to the left',
-      'Reopen closed tabs',
-      '---',
-      'Sort tabs by site',
-      'Mute other tabs',
-      '---',
-      'Save this window as a group',
-      'Close window and keep as group',
-      '---',
-      'Save windows as workspace',
-      'Save this window as workspace',
-      'Open workspace',
-    ],
-  );
+/**
+ * Entries as text: a title, " (greyed out)" when disabled, and a submenu's own entries indented under it.
+ *
+ * @param {readonly import('../extension/shared/actions.js').MenuEntry[]} entries - The entries.
+ * @param {string} [indent] - What each line starts with.
+ * @returns {string[]} One line an entry.
+ */
+const outline = (entries, indent = '') => entries.flatMap((entry) => [
+  `${indent}${entry.title}${entry.enabled ? '' : ' (greyed out)'}${entry.children ? ' ›' : ''}`,
+  ...outline(entry.children ?? [], `${indent}  `),
+]);
+/** A window with tabs to group and a workspace saved: everything usable. */
+const BUSY = { ...NO_STATE, closedCount: 1, ungroupedTabs: 3, workspaces: [{ id: 'w1', name: 'Work' }] };
+
+test('menuEntries: a short first level of the everyday actions, then “Close” and “Groups and workspaces” as submenus; no separators anywhere', () => {
+  assert.deepEqual(outline(menuEntries(WORDS, DEFAULTS, BUSY)), [
+    'Close tabs from this site',
+    'Close other tabs from this site',
+    'Close duplicate tabs',
+    'Reopen 1 closed tab',
+    'Sort tabs by site',
+    'Mute other tabs',
+    'Open workspace ›',
+    '  Work',
+    '  Manage workspaces',
+    'Close ›',
+    '  Close tabs not used in 7 days',
+    '  Close tabs to the left',
+    'Groups and workspaces ›',
+    '  Save this window as a group',
+    '  Close window and keep as group',
+    '  Save windows as workspace',
+    '  Save this window as workspace',
+  ]);
+  const entries = menuEntries(WORDS, DEFAULTS, BUSY);
+  assert.equal(entries.length, 9, 'nine rows at the first level, not thirteen');
+  assert.ok(!JSON.stringify(entries).includes('separator'));
+  assert.deepEqual(entries.slice(-2).map((entry) => entry.id), GROUPS.map((group) => group.id));
+  assert.ok(GROUPS.every((group) => !ACTIONS.some((a) => a.id === group.id)), 'a submenu’s id is no action’s');
 });
 
-test('menuEntries: hidden actions are left out, and no dangling separator', () => {
+test('ACTIONS: in the order the menu reads, every id as before the menu was regrouped', () => {
+  assert.deepEqual(ACTIONS.map((a) => `${a.id}${a.group ? ` [${a.group}]` : ''}`), [
+    'close-site-tabs', 'close-other-site-tabs', 'close-duplicate-tabs', 'reopen-closed-tabs', 'sort-tabs-by-site', 'mute-other-tabs',
+    'open-workspace',
+    'close-inactive-tabs [close]', 'close-tabs-to-left [close]',
+    'save-window-as-group [saved]', 'close-window-keep-group [saved]', 'save-workspace [saved]', 'save-window-workspace [saved]',
+  ]);
+});
+
+test('menuEntries: a submenu left with one visible action shows that action at the first level instead; with none, it isn’t there', () => {
+  const one = normalizeSettings({ hiddenActions: ['close-tabs-to-left', 'save-window-as-group', 'close-window-keep-group', 'save-workspace'] });
+  assert.deepEqual(outline(menuEntries(WORDS, one, BUSY)).slice(-2), ['Close tabs not used in 7 days', 'Save this window as workspace']);
+  const none = normalizeSettings({ hiddenActions: ['close-inactive-tabs', 'close-tabs-to-left'] });
+  assert.deepEqual(menuEntries(WORDS, none, BUSY).map((entry) => entry.id).slice(-2), ['open-workspace', 'menu-saved']);
+});
+
+test('menuEntries: a submenu with nothing usable just now isn’t shown; with one usable action it is, the rest greyed out', () => {
+  // An incognito window with only pinned tabs, and the workspaces full: nothing to save anywhere.
+  const full = Array.from({ length: 40 }, (_, i) => ({ id: `w${i}`, name: `W${i}` }));
+  const nothing = { ...NO_STATE, incognito: true, workspaces: full };
+  assert.deepEqual(menuEntries(WORDS, DEFAULTS, nothing).map((entry) => entry.id).slice(-2), ['open-workspace', 'menu-close']);
+  // An ordinary window with only pinned tabs: the workspace items work, the group ones don’t.
+  assert.deepEqual(outline(menuEntries(WORDS, DEFAULTS, NO_STATE)).slice(-5), [
+    'Groups and workspaces ›',
+    '  Save this window as a group (greyed out)',
+    '  Close window and keep as group (greyed out)',
+    '  Save windows as workspace',
+    '  Save this window as workspace',
+  ]);
+  // A lone action that can’t be used stays, greyed out, as it would in a longer menu.
+  const lone = normalizeSettings({ hiddenActions: ['close-window-keep-group', 'save-workspace', 'save-window-workspace'] });
+  assert.equal(outline(menuEntries(WORDS, lone, NO_STATE)).at(-1), 'Save this window as a group (greyed out)');
+});
+
+test('menuEntries: hidden actions are left out; all hidden, there’s no menu', () => {
   const settings = normalizeSettings({
     hiddenActions: [
       'mute-other-tabs', 'sort-tabs-by-site', 'close-tabs-to-left', 'save-window-as-group', 'close-window-keep-group',
       'save-workspace', 'save-window-workspace', 'open-workspace',
     ],
   });
-  const entries = menuEntries(WORDS, settings);
-  assert.equal(entries.some((e) => e.separator), false);
-  assert.deepEqual(entries.map((e) => e.id), [
+  assert.deepEqual(menuEntries(WORDS, settings).map((e) => e.id), [
     'close-site-tabs',
     'close-other-site-tabs',
     'close-duplicate-tabs',
-    'close-inactive-tabs',
     'reopen-closed-tabs',
+    'close-inactive-tabs',
   ]);
   assert.deepEqual(menuEntries(WORDS, normalizeSettings({ hiddenActions: ACTIONS.map((a) => a.id) })), []);
 });
@@ -518,9 +567,9 @@ test('manifest: every action has a matching command described by the action’s 
     [SWITCH_LAST_MESSAGE, ...ACTIONS.map((a) => a.message)].map((key) => WORDS.t(key)),
     [
       'Switch to last used tab', 'Close tabs from this site', 'Close other tabs from this site', 'Close duplicate tabs',
-      'Close inactive tabs', 'Close tabs to the left', 'Reopen closed tabs', 'Sort tabs by site', 'Mute or unmute other tabs',
-      'Save this window as a group', 'Close window and keep as group', 'Save windows as workspace',
-      'Save this window as workspace', 'Open last workspace',
+      'Reopen closed tabs', 'Sort tabs by site', 'Mute or unmute other tabs', 'Open last workspace',
+      'Close inactive tabs', 'Close tabs to the left',
+      'Save this window as a group', 'Close window and keep as group', 'Save windows as workspace', 'Save this window as workspace',
     ],
     'as Chrome’s Keyboard shortcuts page lists them',
   );

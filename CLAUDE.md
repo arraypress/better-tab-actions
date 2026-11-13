@@ -109,6 +109,35 @@ events) updates only the items whose title or greyed-out state changed: "Reopen 
 `contexts: ['tab']` puts the items on the tab strip's menu; the manifest's `minimum_chrome_version`
 is 150.
 
+- **Structure** (`shared/actions.js` `menuEntries`, `GROUPS`; David saw thirteen items in one unbroken list in
+  Chrome 157, 14 Nov 2026). First level: Close tabs from this site, Close other tabs from this site, Close
+  duplicate tabs, Reopen closed tabs, Sort tabs by site, Mute other tabs, Open workspace ›, then the submenus
+  **Close ›** (not used in N days, to the left) and **Groups and workspaces ›** (the two group and two save
+  actions). An action's `group` says which submenu; `ACTIONS` is in the order the menu reads, and the settings
+  page's Menu card lists it the same way, each submenu's name over its actions. A submenu with one visible
+  action shows that action at the first level; with none visible, or none usable just now (all greyed out), it
+  isn't there. "Open workspace ›" stays at the first level: inside "Groups and workspaces" its workspaces would
+  be four menus deep. Ids, commands and `hiddenActions` are unchanged; the submenus' own ids are `menu-close`
+  and `menu-saved`.
+- **A submenu coming or going needs a whole build** (items can't be added one at a time in place), so
+  `refresh()` compares the items' ids with what the menu was last built with (`menuBuilt` in
+  `chrome.storage.session`, as a new run of the worker has no memory of it) and builds when they differ.
+
+What real Chrome does:
+- **No separators in a tab-menu submenu.** `type: 'separator'` items are accepted by `contextMenus.create` and
+  never drawn there (seen in Chrome 157 on macOS; the same extension's separators show in the page menu). From
+  Chromium's source (`main`, read again 14 Nov 2026): `TabMenuModel` builds its extension items in its
+  constructor, each extension's submenu being a `ui::SimpleMenuModel` whose delegate is the
+  `TabContextMenuController`; `SimpleMenuModel::AddSeparator` adds nothing unless an item before it is visible,
+  and `TabContextMenuController::IsCommandIdVisible` answers `false` for every extension item until `LoadModel`
+  runs, which is after the constructor. So every separator in any extension submenu of the tab menu is dropped,
+  at any depth, whatever is around it: no shape of item gets one drawn. Not sent any more; grouping is by
+  submenu. `docs/bug-report/report.md` is the write-up for Chromium; if it's fixed, separators could come back.
+- **Nesting.** `ContextMenuMatcher::RecursivelyAppendExtensionItems` recurses with no depth limit (the only
+  bound is 1,000 command ids), and Chromium 156 accepts the third-level items (`test/e2e/worker.mjs`).
+- **What isn't verified by a test:** how the native menu looks. Playwright can't open it; the e2e checks only
+  that Chromium holds the items sent, under the parents sent, and none of the old separators.
+
 ## Reopen closed tabs
 `shared/undo.js`: the last batch of tabs an action closed, in `chrome.storage.session`. Left out
 of it (they close for good): incognito tabs (Chrome itself keeps no closed tabs for incognito
@@ -211,7 +240,7 @@ in the person's language (`dateTime`).
   waking, and takes one snapshot only if something changed.
 - "Take snapshot" on the settings page leaves the settings tab out (as "Replace with current windows" does);
   an automatic one keeps every window. "Save as workspace" copies it (named by `workspaceName`); the snapshot
-  stays. No menu item or command for now: the menu is already thirteen items.
+  stays. No menu item or command for now: the menu is kept short.
 
 ## Close unused tabs automatically
 `background/auto-close.js`: an alarm (`close-unused-tabs`, every `CHECK_MINUTES` = 5) while `autoClose` is on

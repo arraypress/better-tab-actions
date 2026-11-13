@@ -15,8 +15,9 @@
  * the family's other store screenshots. Chrome's own tab right-click menu is native and can't be
  * captured headlessly, so it is drawn (frame.mjs): Chrome 157 on macOS, items and order from Chromium's tab_menu_model.cc at tag
  * 157.0.8103.39 (Title Case strings on macOS), for a signed-out profile with one window and no
- * tab groups. The extension's submenu has no separator: Chrome drops separators in tab-menu
- * submenus (docs/bug-report/report.md), so that's what users see today.
+ * tab groups. The extension's submenu is its first level: the everyday actions, then "Open
+ * workspace", "Close" and "Groups and workspaces" with their arrows (the build sends no
+ * separators: Chrome draws none in a tab-menu submenu, docs/bug-report/report.md).
  *
  * Web pages in the shots are made up (no real sites); photos are CC0 from Wikimedia Commons.
  *
@@ -179,14 +180,6 @@ const entries = (state) => helper.evaluate(async ({ state, modules }) => {
 // The menu shots' window: five ungrouped tabs, none pinned, so the group items are enabled.
 const defaultEntries = await entries({ ungroupedTabs: 5 });
 /**
- * Chrome drops the separator in tab-menu submenus (see the header).
- *
- * @param {readonly MenuEntry[]} list - The entries.
- * @returns {Extract<MenuEntry, {id: string}>[]} The ones a user sees.
- */
-const shown = (list) => list.flatMap((entry) => (entry.separator ? [] : [entry]));
-
-/**
  * @param {readonly MenuEntry[]} list - The entries.
  * @param {string} id - An action.
  * @returns {string} Its label.
@@ -300,7 +293,7 @@ function menuShot({ caption, tabs, url, urlHost, page, hover, entryList, theme =
   const mx = WIN.x + tab.x + Math.round(tab.width * 0.45);
   const my = WIN.y + 26;
   const main = menu(chromeTabMenu({ closeRightEnabled: clickTab < tabs.length - 1 }), { x: mx, y: my, width: 236, theme });
-  const subItems = shown(entryList).map((entry) => ({ title: entry.title, disabled: !entry.enabled, selected: entry.title === hover }));
+  const subItems = entryList.map((entry) => ({ title: entry.title, disabled: !entry.enabled, selected: entry.title === hover, sub: Boolean(entry.children) }));
   // Level with "More tab actions", or moved up as far as needed to stay on screen, as macOS does.
   // The stage is zoomed about the window's corner, so the screen's bottom is nearer in its units.
   const { height: subHeight } = menu(subItems, { x: 0, y: 0, width: 246, theme });
@@ -333,7 +326,7 @@ shots.push(menuShot({
   tabs: trailTabs(1),
   url: 'trailhead.example/bierstadt-lake-loop', urlHost: 'trailhead.example',
   page: content.bierstadt,
-  hover: shown(defaultEntries)[0]?.title ?? '',
+  hover: defaultEntries[0]?.title ?? '',
   entryList: defaultEntries,
   clickTab: 1,
 }));

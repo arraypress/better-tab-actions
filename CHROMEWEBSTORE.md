@@ -83,7 +83,7 @@ English (the extension's `default_locale` is `en`; `en_GB` is included).
 | Asset | Dimensions | Status | Filename |
 |-------|-----------|--------|----------|
 | Store Icon [REQUIRED] | 128×128 PNG | ✅ Ready | `extension/icons/icon-128.png` |
-| Screenshot 1 [REQUIRED] | 1280×800 | ✅ Ready | `store/screenshot-1.png`: “Close every tab from this site”, the tab menu with the submenu open (all thirteen items, the group and workspace ones included; “Open workspace” greyed out as nothing is saved yet) |
+| Screenshot 1 [REQUIRED] | 1280×800 | ✅ Ready | `store/screenshot-1.png`: “Close every tab from this site”, the tab menu with the submenu open (its nine rows: six everyday actions, “Open workspace” greyed out as nothing is saved yet, and the “Close” and “Groups and workspaces” submenus with their arrows) |
 | Screenshot 2 | 1280×800 | ✅ Ready | `store/screenshot-2.png`: “Close duplicate tabs, keep one of each”, the tab strip before and after |
 | Screenshot 3 | 1280×800 | ✅ Ready | `store/screenshot-3.png`: “Mute every other tab”, the menu over tabs playing sound |
 | Screenshot 4 | 1280×800 | ✅ Ready | `store/screenshot-4.png`: “Choose what’s in the menu”, the settings page |
@@ -101,7 +101,7 @@ and Chrome's window are the kit's `storeFrame`, as in the family's other screens
 - Chrome's tab right-click menu is native, so it can't be captured headlessly; shots 1 and 3 draw it (`store/tools/frame.mjs`).
   - Its items and order come from Chromium's `tab_menu_model.cc` at tag 157.0.8103.39. They use the macOS Title Case strings, for a signed-out profile with one window and no tab groups.
   - The submenu's labels come from the build's `menuEntries()`. It's moved up to stay on screen, as macOS does with a tall submenu.
-  - The submenu has **no separator** because Chrome 157 drops separators in tab-menu submenus (`docs/bug-report/report.md`), so this is what users see today.
+  - The submenu has **no separator**: Chrome drops separators in tab-menu submenus (`docs/bug-report/report.md`), so the build sends none and groups with submenus instead. The two nested submenus are drawn closed (a row with an arrow).
   - Re-check these two shots if Chrome changes the tab menu.
 - The web pages behind the menus are made up (no real sites). Photos are CC0, from Wikimedia Commons: “Bierstadt Lake Trail, Rocky Mountain National Park, 2009”, “Lake Mountain Landscape”, “Lighthouse Chania evening sun”.
 

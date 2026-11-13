@@ -10,7 +10,7 @@ import { menuEntries, menuState, groupTitle } from '../extension/shared/actions.
 import { DEFAULTS } from '../extension/shared/settings.js';
 import { closedCount } from '../extension/shared/undo.js';
 import { fakeBrowser, runOn, tabsAt, EXTENSION_ID } from './fake-browser.js';
-import { WORDS } from './helpers.js';
+import { entryOf, WORDS } from './helpers.js';
 
 const NOW = Date.UTC(2026, 10, 8, 12);
 
@@ -35,7 +35,7 @@ async function groupItems(b, windowId) {
   const state = menuState(await b.tabs.query({}), await closedCount(b.session), EXTENSION_ID, windowId);
   const entries = menuEntries(WORDS, DEFAULTS, state);
   /** @param {string} id */
-  const enabled = (id) => entries.find((e) => e.id === id)?.enabled;
+  const enabled = (id) => entryOf(entries, id)?.enabled;
   return { save: enabled('save-window-as-group'), close: enabled('close-window-keep-group') };
 }
 

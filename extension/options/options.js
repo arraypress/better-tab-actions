@@ -15,7 +15,7 @@ import {
   valueRow, withoutSite, withSite, withSiteReplaced,
 } from '../vendor/extension-kit/index.js';
 import { ABOUT_LINKS } from './about-links.js';
-import { ACTIONS, MENU_MESSAGE, menuTitle, SWITCH_LAST, SWITCH_LAST_MESSAGE } from '../shared/actions.js';
+import { ACTIONS, GROUPS, MENU_MESSAGE, menuTitle, SWITCH_LAST, SWITCH_LAST_MESSAGE } from '../shared/actions.js';
 import { AUTO_CLOSE_HOURS, normalizeSettings, settingsStore, SNAPSHOT_MINUTES } from '../shared/settings.js';
 import { MAX_AUTO } from '../shared/snapshots.js';
 import { duration, minutesText } from '../shared/text.js';
@@ -79,7 +79,8 @@ showWithNames(byId('no-workspaces-text'), 'optionsNoWorkspaces', [t(MENU_MESSAGE
 byId('workspaces-full-text').textContent = t('optionsWorkspacesFull', [String(MAX_WORKSPACES)]);
 
 /**
- * The Menu card's rows, one per action in menu order: a label and its switch. Made once and
+ * The Menu card's rows, one per action in the order the menu reads (the everyday ones, then each
+ * submenu's under its name): a label and its switch. Made once and
  * updated in place, so a switch keeps the keyboard focus when it's turned on or off.
  *
  * @type {{action: Action, text: HTMLSpanElement, toggle: HTMLInputElement}[]}
@@ -97,6 +98,13 @@ const menuRows = ACTIONS.map((action) => {
   const text = make('span', 'label');
   const row = make('label', 'row');
   row.append(text, toggle);
+  // The menu's own submenus are named above their actions, so the list reads as the menu does.
+  const group = GROUPS.find((g) => g.group === action.group);
+  if (group && ACTIONS.find((other) => other.group === action.group) === action) {
+    const heading = make('p', 'row text menu-group');
+    heading.append(make('span', 'label secondary', t(group.message)));
+    byId('menu-items').append(heading);
+  }
   byId('menu-items').append(row);
   return { action, text, toggle };
 });

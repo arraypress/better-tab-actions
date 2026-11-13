@@ -15,15 +15,15 @@ Right-click any tab → **More tab actions**:
 | Close tabs from this site | Closes every tab on the same site as the one you clicked |
 | Close other tabs from this site | The same, but keeps the tab you clicked |
 | Close duplicate tabs | Keeps one tab per page, and the tab in front in any other window |
-| Close tabs not used in 7 days | The number of days is a setting |
-| Close tabs to the left | Chrome has “to the right”; this is the other side |
 | Reopen closed tabs | Brings back the last batch it closed, in their places and groups |
 | Sort tabs by site | Puts each site’s tabs next to each other |
 | Mute other tabs / Unmute tabs | Silences every tab except the one you clicked |
-| Save this window as a group | Puts the window’s loose tabs into one saved tab group |
-| Close window and keep as group | The same, then closes the window |
-| Save windows as workspace | Saves your windows with their tabs, pinned tabs, groups and sizes |
 | Open workspace › | Reopens a saved workspace; only the tab in front of each window stays loaded |
+| Close › Close tabs not used in 7 days | The number of days is a setting |
+| Close › Close tabs to the left | Chrome has “to the right”; this is the other side |
+| Groups and workspaces › Save this window as a group | Puts the window’s loose tabs into one saved tab group |
+| Groups and workspaces › Close window and keep as group | The same, then closes the window |
+| Groups and workspaces › Save windows as workspace | Saves your windows with their tabs, pinned tabs, groups and sizes (or just this window) |
 
 - **Close unused tabs automatically** (off until you turn it on): closes tabs you haven’t used for
   the time you pick, counting only time Chrome is open and your computer is awake, from when you

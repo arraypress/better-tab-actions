@@ -15,7 +15,7 @@ import {
   openWorkspace, replaceWorkspace, snapshotWindows, unloadIfAnswered, UNLOAD_PREFIX, updateWorkspaces, workspaceName, workspaceSummary,
 } from '../extension/shared/workspaces.js';
 import { EXTENSION_ID, fakeBrowser, runOn, SCREEN } from './fake-browser.js';
-import { errorsLogged, WORDS } from './helpers.js';
+import { entryOf, errorsLogged, WORDS } from './helpers.js';
 
 /** @import { OpenWindow, Workspace, WorkspaceWindow } from '../extension/shared/workspaces.js' */
 /** @import { Settings } from '../extension/shared/settings.js' */
@@ -259,9 +259,9 @@ test('save-workspace: every normal window, not incognito, named after their main
   assert.deepEqual(saved.windows.map((win) => win.tabs.length), [4, 2]);
 
   const state = menuState(await b.tabs.query({}), 0, EXTENSION_ID, 1, await loadWorkspaces(b.local));
-  const open = menuEntries(WORDS, DEFAULTS, state).find((entry) => entry.id === 'open-workspace');
+  const open = entryOf(menuEntries(WORDS, DEFAULTS, state), 'open-workspace');
   assert.equal(open?.enabled, true);
-  assert.deepEqual(open?.children?.map((entry) => entry.title ?? '---'), ['github.com and docs.com', '---', 'Manage workspaces']);
+  assert.deepEqual(open?.children?.map((entry) => entry.title), ['github.com and docs.com', 'Manage workspaces']);
   assert.equal(open?.children?.[0].id, `${WORKSPACE_ITEM_PREFIX}${saved.id}`);
 });
 
@@ -468,10 +468,10 @@ test('save actions: greyed out and do nothing once MAX_WORKSPACES are kept', asy
 
   const entries = menuEntries(WORDS, DEFAULTS, menuState(await b.tabs.query({}), 0, EXTENSION_ID, 1, await loadWorkspaces(b.local)));
   /** @param {string} id */
-  const enabled = (id) => entries.find((entry) => entry.id === id)?.enabled;
+  const enabled = (id) => entryOf(entries, id)?.enabled;
   assert.deepEqual([enabled('save-workspace'), enabled('save-window-workspace'), enabled('open-workspace')], [false, false, true]);
-  const open = entries.find((entry) => entry.id === 'open-workspace');
-  assert.equal(open?.children?.length, MENU_WORKSPACES + 2, 'the latest ten, a separator and “Manage workspaces”');
+  const open = entryOf(entries, 'open-workspace');
+  assert.equal(open?.children?.length, MENU_WORKSPACES + 1, 'the latest ten and “Manage workspaces”');
   assert.equal(open?.children?.[0].title, `w${MAX_WORKSPACES - 1}`);
   assert.equal(open?.children?.at(-1)?.id, MANAGE_WORKSPACES);
 });
@@ -479,10 +479,10 @@ test('save actions: greyed out and do nothing once MAX_WORKSPACES are kept', asy
 test('menu: “Open workspace” is greyed out with no submenu while nothing is saved; save in incognito is greyed out', async () => {
   const b = twoWindows();
   const entries = menuEntries(WORDS, DEFAULTS, menuState(await b.tabs.query({}), 0, EXTENSION_ID, 3, []));
-  const open = entries.find((entry) => entry.id === 'open-workspace');
+  const open = entryOf(entries, 'open-workspace');
   assert.deepEqual([open?.enabled, open?.children], [false, undefined]);
-  assert.equal(entries.find((entry) => entry.id === 'save-window-workspace')?.enabled, false);
-  assert.equal(entries.find((entry) => entry.id === 'save-workspace')?.enabled, true);
+  assert.equal(entryOf(entries, 'save-window-workspace')?.enabled, false);
+  assert.equal(entryOf(entries, 'save-workspace')?.enabled, true);
 });
 
 test('updateWorkspaces: stores the list most recently saved first', async () => {

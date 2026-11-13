@@ -30,16 +30,16 @@
     "close-site-tabs": { "description": "__MSG_actionCloseSiteTabs__" },
     "close-other-site-tabs": { "description": "__MSG_actionCloseOtherSiteTabs__" },
     "close-duplicate-tabs": { "description": "__MSG_actionCloseDuplicateTabs__" },
-    "close-inactive-tabs": { "description": "__MSG_actionCloseInactiveTabs__" },
-    "close-tabs-to-left": { "description": "__MSG_actionCloseTabsToLeft__" },
     "reopen-closed-tabs": { "description": "__MSG_actionReopenClosedTabs__" },
     "sort-tabs-by-site": { "description": "__MSG_actionSortTabsBySite__" },
     "mute-other-tabs": { "description": "__MSG_actionMuteOtherTabs__" },
+    "open-workspace": { "description": "__MSG_actionOpenWorkspace__" },
+    "close-inactive-tabs": { "description": "__MSG_actionCloseInactiveTabs__" },
+    "close-tabs-to-left": { "description": "__MSG_actionCloseTabsToLeft__" },
     "save-window-as-group": { "description": "__MSG_actionSaveWindowAsGroup__" },
     "close-window-keep-group": { "description": "__MSG_actionCloseWindowKeepGroup__" },
     "save-workspace": { "description": "__MSG_actionSaveWorkspace__" },
-    "save-window-workspace": { "description": "__MSG_actionSaveWindowWorkspace__" },
-    "open-workspace": { "description": "__MSG_actionOpenWorkspace__" }
+    "save-window-workspace": { "description": "__MSG_actionSaveWindowWorkspace__" }
   },
   "background": {
     "service_worker": "background/background.js",

@@ -65,7 +65,7 @@ import { loadWorkspaces, MAX_WORKSPACES, MENU_WORKSPACES, openWorkspace, saveWor
  * @typedef {{
  *   id: string,
  *   message: string,
- *   section: number,
+ *   group?: ActionGroup,
  *   menuTitle?: (words: Words, settings: Settings, state: MenuState) => string,
  *   enabled?: (state: MenuState) => boolean,
  *   children?: (state: MenuState, words: Words) => MenuEntry[],
@@ -77,10 +77,17 @@ import { loadWorkspaces, MAX_WORKSPACES, MENU_WORKSPACES, openWorkspace, saveWor
  */
 
 /**
- * An entry in the submenu: an action (perhaps a submenu of its own), or a separator between sections.
+ * The submenu an action sits in when it isn't an everyday one: more ways to close tabs, or
+ * saving windows as groups and workspaces.
  *
- * @typedef {{id: string, title: string, enabled: boolean, children?: MenuEntry[], separator?: undefined}
- *   | {separator: true, id?: undefined, title?: undefined, enabled?: undefined, children?: undefined}} MenuEntry
+ * @typedef {'close' | 'saved'} ActionGroup
+ */
+
+/**
+ * An entry in the menu: an action, or a submenu (an action's own, as "Open workspace", or one of
+ * {@link GROUPS}) with its entries as `children`.
+ *
+ * @typedef {{id: string, title: string, enabled: boolean, children?: MenuEntry[]}} MenuEntry
  */
 
 /** The submenu's title's key in `_locales`: “More tab actions”, as Chrome words its own “More …” entries. */
@@ -374,7 +381,20 @@ function sortMoves(target, tabs) {
 }
 
 /**
- * The actions, in menu order. `section` groups them; a separator goes between sections.
+ * The menu's own submenus, in the order they come after the everyday actions, each with its
+ * item's id and its title's key in `_locales`. Submenus do the grouping because Chrome draws no
+ * separators in a tab-menu submenu (CLAUDE.md, "The menu").
+ *
+ * @type {readonly {group: ActionGroup, id: string, message: string}[]}
+ */
+export const GROUPS = Object.freeze([
+  { group: 'close', id: 'menu-close', message: 'menuGroupClose' },
+  { group: 'saved', id: 'menu-saved', message: 'menuGroupSaved' },
+]);
+
+/**
+ * The actions, in the order the menu reads: the everyday ones at the first level, then each
+ * submenu's ({@link GROUPS}), which is also the order the settings page lists them in.
  *
  * @type {readonly Action[]}
  */
@@ -382,43 +402,18 @@ export const ACTIONS = [
   {
     id: 'close-site-tabs',
     message: 'actionCloseSiteTabs',
-    section: 1,
     plan: (target, tabs, { settings }) => close(sameSite(target, tabs, settings)),
   },
   {
     id: 'close-other-site-tabs',
     message: 'actionCloseOtherSiteTabs',
-    section: 1,
     plan: (target, tabs, { settings }) =>
       close(sameSite(target, tabs, settings).filter((tab) => tab.id !== target.id)),
   },
   {
     id: 'close-duplicate-tabs',
     message: 'actionCloseDuplicateTabs',
-    section: 1,
     plan: (target, tabs, { settings }) => close(duplicates(target, tabs, settings)),
-  },
-  {
-    // Skips active tabs, playing tabs, and tabs with no last-used time.
-    id: 'close-inactive-tabs',
-    message: 'actionCloseInactiveTabs',
-    menuTitle: (words, { inactiveDays }) => counted(inactiveDays, 'menuCloseInactiveOne', 'menuCloseInactive', words),
-    section: 1,
-    plan: (target, tabs, { now, settings }) =>
-      close(inScope(target, tabs, settings).filter((tab) => unused(tab, settings, now, settings.inactiveDays * DAY_MS))),
-  },
-  {
-    // Same window only, like Chrome's own "Close tabs to the right".
-    id: 'close-tabs-to-left',
-    message: 'actionCloseTabsToLeft',
-    section: 1,
-    plan: (target, tabs, { settings }) =>
-      close(
-        tabs.filter(
-          (tab) =>
-            closable(tab, settings) && tab.windowId === target.windowId && tab.index < target.index,
-        ),
-      ),
   },
   {
     id: 'reopen-closed-tabs',
@@ -426,14 +421,12 @@ export const ACTIONS = [
     menuTitle: (words, settings, { closedCount }) =>
       (closedCount ? counted(closedCount, 'menuReopenOne', 'menuReopen', words) : words.t('actionReopenClosedTabs')),
     enabled: ({ closedCount }) => closedCount > 0,
-    section: 1,
     reopen: true,
   },
   {
     // This window only; tabs keep their groups (see sortMoves).
     id: 'sort-tabs-by-site',
     message: 'actionSortTabsBySite',
-    section: 2,
     plan: (target, tabs) => {
       const moves = sortMoves(target, tabs);
       return { effect: 'move', moves, ids: moves.map((move) => move.id) };
@@ -445,7 +438,6 @@ export const ACTIONS = [
     id: 'mute-other-tabs',
     message: 'actionMuteOtherTabs',
     menuTitle: ({ t }, settings, { mutedByUs }) => (mutedByUs ? t('menuUnmuteTabs') : t('menuMuteOtherTabs')),
-    section: 2,
     plan: (target, tabs, { extensionId }) => {
       const ours = tabs.filter((tab) => mutedByExtension(tab, extensionId));
       if (ours.length) return { effect: 'unmute', ids: ids(ours) };
@@ -456,13 +448,50 @@ export const ACTIONS = [
     },
   },
   {
+    // In the menu, a submenu of the latest workspaces, then "Manage workspaces". As a keyboard
+    // shortcut, it opens the most recently saved one.
+    id: 'open-workspace',
+    message: 'actionOpenWorkspace',
+    menuTitle: ({ t }) => t('menuOpenWorkspace'),
+    enabled: ({ workspaces }) => workspaces.length > 0,
+    children: ({ workspaces }, { t }) => workspaces.length
+      ? [
+        ...workspaces.slice(0, MENU_WORKSPACES).map(({ id, name }) => ({ id: `${WORKSPACE_ITEM_PREFIX}${id}`, title: name, enabled: true })),
+        { id: MANAGE_WORKSPACES, title: t('menuManageWorkspaces'), enabled: true },
+      ]
+      : [],
+    workspace: 'open',
+  },
+  {
+    // Skips active tabs, playing tabs, and tabs with no last-used time.
+    id: 'close-inactive-tabs',
+    message: 'actionCloseInactiveTabs',
+    menuTitle: (words, { inactiveDays }) => counted(inactiveDays, 'menuCloseInactiveOne', 'menuCloseInactive', words),
+    group: 'close',
+    plan: (target, tabs, { now, settings }) =>
+      close(inScope(target, tabs, settings).filter((tab) => unused(tab, settings, now, settings.inactiveDays * DAY_MS))),
+  },
+  {
+    // Same window only, like Chrome's own "Close tabs to the right".
+    id: 'close-tabs-to-left',
+    message: 'actionCloseTabsToLeft',
+    group: 'close',
+    plan: (target, tabs, { settings }) =>
+      close(
+        tabs.filter(
+          (tab) =>
+            closable(tab, settings) && tab.windowId === target.windowId && tab.index < target.index,
+        ),
+      ),
+  },
+  {
     // Chrome saves every tab group it shows, including ones extensions make, so the new group
     // also appears in saved groups. Groups already in the window stay as they are; pinned tabs
     // stay pinned and ungrouped.
     id: 'save-window-as-group',
     message: 'actionSaveWindowAsGroup',
     enabled: ({ ungroupedTabs }) => ungroupedTabs > 0,
-    section: 3,
+    group: 'saved',
     plan: groupWindow,
   },
   {
@@ -475,7 +504,7 @@ export const ACTIONS = [
     id: 'close-window-keep-group',
     message: 'actionCloseWindowKeepGroup',
     enabled: ({ ungroupedTabs, pinnedTabs, incognito }) => ungroupedTabs > 0 && !pinnedTabs && !incognito,
-    section: 3,
+    group: 'saved',
     plan: (target, tabs, ctx) => {
       const inWindow = tabs.filter((tab) => tab.windowId === target.windowId);
       if (target.incognito || inWindow.some((tab) => tab.pinned)) return { effect: 'group', ids: [], title: '' };
@@ -488,7 +517,7 @@ export const ACTIONS = [
     id: 'save-workspace',
     message: 'actionSaveWorkspace',
     enabled: ({ workspaces }) => workspaces.length < MAX_WORKSPACES,
-    section: 4,
+    group: 'saved',
     workspace: 'save',
   },
   {
@@ -496,25 +525,8 @@ export const ACTIONS = [
     id: 'save-window-workspace',
     message: 'actionSaveWindowWorkspace',
     enabled: ({ workspaces, incognito }) => workspaces.length < MAX_WORKSPACES && !incognito,
-    section: 4,
+    group: 'saved',
     workspace: 'save-window',
-  },
-  {
-    // In the menu, a submenu of the latest workspaces, then "Manage workspaces". As a keyboard
-    // shortcut, it opens the most recently saved one.
-    id: 'open-workspace',
-    message: 'actionOpenWorkspace',
-    menuTitle: ({ t }) => t('menuOpenWorkspace'),
-    enabled: ({ workspaces }) => workspaces.length > 0,
-    children: ({ workspaces }, { t }) => workspaces.length
-      ? [
-        ...workspaces.slice(0, MENU_WORKSPACES).map(({ id, name }) => ({ id: `${WORKSPACE_ITEM_PREFIX}${id}`, title: name, enabled: true })),
-        { separator: true },
-        { id: MANAGE_WORKSPACES, title: t('menuManageWorkspaces'), enabled: true },
-      ]
-      : [],
-    section: 4,
-    workspace: 'open',
   },
 ];
 
@@ -536,8 +548,10 @@ export function menuTitle(action, words, settings = DEFAULTS, state = NO_STATE) 
 }
 
 /**
- * The submenu contents: visible actions in order, with a separator between sections that both
- * have visible items.
+ * The "More tab actions" submenu's contents: the visible everyday actions, then each of
+ * {@link GROUPS} as a submenu of its visible actions. A group with one visible action shows that
+ * action at the first level instead (a submenu of one is a click wasted); a group with none
+ * visible, or none that can be used just now, isn't shown at all.
  *
  * @param {Words} words - The extension's words.
  * @param {Settings} [settings] - The user's settings. Default {@link DEFAULTS}.
@@ -546,14 +560,11 @@ export function menuTitle(action, words, settings = DEFAULTS, state = NO_STATE) 
  */
 export function menuEntries(words, settings = DEFAULTS, state = NO_STATE) {
   const hidden = new Set(settings.hiddenActions);
-  /** @type {MenuEntry[]} */
-  const entries = [];
-  /** @type {number | undefined} */
-  let section;
-  for (const action of ACTIONS) {
-    if (hidden.has(action.id)) continue;
-    if (section !== undefined && action.section !== section) entries.push({ separator: true });
-    section = action.section;
+  /**
+   * @param {ActionGroup} [group] - A group; the everyday actions when left out.
+   * @returns {MenuEntry[]} Its visible actions' entries, in order.
+   */
+  const entriesOf = (group) => ACTIONS.filter((action) => action.group === group && !hidden.has(action.id)).map((action) => {
     /** @type {MenuEntry} */
     const entry = {
       id: action.id,
@@ -562,7 +573,13 @@ export function menuEntries(words, settings = DEFAULTS, state = NO_STATE) {
     };
     const children = action.children?.(state, words) ?? [];
     if (children.length) entry.children = children;
-    entries.push(entry);
+    return entry;
+  });
+  const entries = entriesOf();
+  for (const { group, id, message } of GROUPS) {
+    const children = entriesOf(group);
+    if (children.length === 1) entries.push(children[0]);
+    else if (children.some((entry) => entry.enabled)) entries.push({ id, title: words.t(message), enabled: true, children });
   }
   return entries;
 }

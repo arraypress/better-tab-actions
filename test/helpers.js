@@ -48,3 +48,18 @@ export async function errorsLogged(body) {
   }
   return logged;
 }
+
+/**
+ * A menu entry by its id, wherever it is: at the first level or inside a submenu.
+ *
+ * @param {readonly import('../extension/shared/actions.js').MenuEntry[]} entries - The menu's entries.
+ * @param {string} id - An action, or a submenu.
+ * @returns {import('../extension/shared/actions.js').MenuEntry | undefined} The entry, if it's in the menu.
+ */
+export function entryOf(entries, id) {
+  for (const entry of entries) {
+    const found = entry.id === id ? entry : entryOf(entry.children ?? [], id);
+    if (found) return found;
+  }
+  return undefined;
+}

@@ -90,6 +90,12 @@
   "menuManageWorkspaces": {
     "message": "Manage workspaces"
   },
+  "menuGroupClose": {
+    "message": "Close"
+  },
+  "menuGroupSaved": {
+    "message": "Groups and workspaces"
+  },
   "durationHoursOne": {
     "message": "1 hour"
   },

@@ -6,7 +6,8 @@
  *   npm run e2e
  *
  * 1. No command has a key until a person sets one; a command still runs its action.
- * 2. Chrome keeps the menu's items while the worker is stopped.
+ * 2. Chromium holds the menu as sent (the submenus, their items under them, no separators), and
+ *    keeps the items while the worker is stopped.
  * 3. The closed batch outlives the worker: "Reopen closed tabs" brings the tabs back afterwards.
  * 4. The recent tabs outlive it too: "Switch to last used tab" goes back and forth across a stop.
  * 5. So does automatic closing's alarm, which a worker starting again leaves as it is.
@@ -54,6 +55,17 @@ await runChecks(runner, async () => {
   await check('a command runs its action on the tab in front: “Close tabs from this site”', async () => {
     assert.deepEqual((await press(worker, 'close-site-tabs', tabIds[0])).sort(), [tabIds[0], tabIds[2]].sort());
     assert.deepEqual(await strip(windowId), [urls[1], urls[3]]);
+  });
+
+  await check('Chromium takes the menu as it’s sent: the two submenus and their items a level down, and no separators', async () => {
+    await until(() => inMenu('menu-saved'), 'the menu');
+    for (const id of ['more-tab-actions', 'close-site-tabs', 'open-workspace', 'menu-close', 'menu-saved']) assert.equal(await inMenu(id), true, id);
+    // An item can be given the parent it has; one that isn't there is refused.
+    const under = (/** @type {string} */ id, /** @type {string} */ parentId) => worker.evaluate(({ id, parentId }) => chrome.contextMenus.update(id, { parentId }).then(() => true, () => false), { id, parentId });
+    assert.equal(await under('close-inactive-tabs', 'menu-close'), true);
+    assert.equal(await under('close-tabs-to-left', 'menu-close'), true);
+    assert.equal(await under('save-window-workspace', 'menu-saved'), true);
+    for (const old of ['more-tab-actions-separator-6', 'more-tab-actions-separator-9', 'more-tab-actions-separator-12']) assert.equal(await inMenu(old), false, old);
   });
 
   await check('Chrome keeps the menu while the worker is stopped, and the closed batch outlives it: “Reopen closed tabs” puts both tabs back', async () => {

@@ -50,7 +50,7 @@ async function installed() {
   return { chrome, ...handlers };
 }
 
-test('menuItems: the submenu first, each parent before its children, separators with ids of their own; nothing when every action is hidden', () => {
+test('menuItems: the submenu first, each parent before its children, at most three levels and no separator; nothing when every action is hidden', () => {
   const items = menuItems(menuEntries(WORDS, undefined, {
     closedCount: 2, mutedByUs: false, ungroupedTabs: 1, pinnedTabs: 0, incognito: false, workspaces: [{ id: 'w1', name: 'Work' }],
   }), WORDS.t(MENU_MESSAGE));
@@ -60,10 +60,15 @@ test('menuItems: the submenu first, each parent before its children, separators 
   for (const [i, item] of items.entries()) {
     if (item.parentId !== undefined) assert.ok(items.findIndex((other) => other.id === item.parentId) < i, `${item.id} comes after its parent`);
   }
-  assert.deepEqual(
-    items.filter((item) => item.parentId === 'open-workspace').map((item) => item.title ?? item.type),
-    ['Work', 'separator', 'Manage workspaces'],
-  );
+  assert.deepEqual(items.filter((item) => item.parentId === 'open-workspace').map((item) => item.title), ['Work', 'Manage workspaces']);
+  assert.deepEqual(items.filter((item) => item.parentId === PARENT_ID).map((item) => item.id), [
+    'close-site-tabs', 'close-other-site-tabs', 'close-duplicate-tabs', 'reopen-closed-tabs', 'sort-tabs-by-site', 'mute-other-tabs',
+    'open-workspace', 'menu-close', 'menu-saved',
+  ]);
+  assert.deepEqual(items.filter((item) => item.parentId === 'menu-close').map((item) => item.id), ['close-inactive-tabs', 'close-tabs-to-left']);
+  assert.ok(items.every((item) => item.type === undefined), 'Chrome draws no separator in a tab-menu submenu: none is sent');
+  // More tab actions › a submenu › its items: nothing deeper.
+  assert.ok(items.every((item) => [undefined, PARENT_ID].includes(/** @type {string | undefined} */ (items.find((parent) => parent.id === item.parentId)?.parentId))));
   assert.deepEqual(items.find((item) => item.id === 'reopen-closed-tabs'), {
     id: 'reopen-closed-tabs', parentId: PARENT_ID, title: 'Reopen 2 closed tabs', enabled: true, contexts: ['tab'],
   });
@@ -77,8 +82,8 @@ test('install and browser start in one run (a Chrome update): one whole menu, no
   await Promise.all([chrome.runtime.onInstalled.fire(), chrome.runtime.onStartup.fire()]);
   assert.deepEqual(chrome.contextMenus.errors, [], 'no “Cannot create item with duplicate id”');
   assert.deepEqual(
-    chrome.contextMenus.items.filter((item) => item.type !== 'separator').map((item) => item.id),
-    [PARENT_ID, ...ACTIONS.map((action) => action.id)],
+    chrome.contextMenus.items.map((item) => item.id).sort(),
+    [PARENT_ID, 'menu-close', 'menu-saved', ...ACTIONS.map((action) => action.id)].sort(),
   );
   assert.equal(chrome.contextMenus.shows('reopen-closed-tabs'), 'Reopen closed tabs (greyed out)');
 });
@@ -144,6 +149,32 @@ test('muting, grouping and window focus keep the labels in step, one update for 
   assert.deepEqual(chrome.contextMenus.updates.map((update) => update.id), ['mute-other-tabs', 'save-window-as-group', 'close-window-keep-group']);
 });
 
+test('a submenu with nothing usable goes from the menu, and comes back, as the focused window changes (a whole build: items can’t be added one by one)', async () => {
+  const chrome = fakeChrome([
+    { id: 1, url: 'https://a.com/', active: true },
+    { id: 2, url: 'https://b.com/', windowId: 2, active: true, pinned: true },
+  ], { windows: { 1: { focused: true } } });
+  startWorker(chrome.api);
+  await chrome.runtime.onInstalled.fire();
+  // Forty workspaces kept: only the group items are left to use, and a window of pinned tabs has nothing to group.
+  const full = Array.from({ length: 40 }, (_, i) => ({ id: `w${i}`, name: `W${i}`, savedAt: i, skipped: 0, windows: [] }));
+  await chrome.api.storage.local.set({ workspaces: full });
+  await until(() => chrome.contextMenus.shows('save-workspace') === 'Save windows as workspace (greyed out)', 'the full workspaces');
+  assert.equal(chrome.contextMenus.shows('menu-saved'), 'Groups and workspaces');
+  const removals = chrome.contextMenus.removals;
+
+  await chrome.windows.update(2, { focused: true });
+  // (Waited for to its last item: a build takes the old menu away first.)
+  await until(() => chrome.contextMenus.shows('menu-saved') === undefined && chrome.contextMenus.shows('close-tabs-to-left') !== undefined, 'the submenu to go');
+  assert.equal(chrome.contextMenus.shows('save-window-as-group'), undefined);
+  assert.equal(chrome.contextMenus.shows('menu-close'), 'Close');
+  assert.ok(chrome.contextMenus.removals > removals, 'built whole');
+  await chrome.windows.update(1, { focused: true });
+  await until(() => chrome.contextMenus.shows('menu-saved') === 'Groups and workspaces' && chrome.contextMenus.shows('save-window-workspace') !== undefined, 'the submenu to come back');
+  assert.equal(chrome.contextMenus.shows('save-window-as-group'), 'Save this window as a group');
+  assert.deepEqual(chrome.contextMenus.errors, []);
+});
+
 test('“Switch to last used tab” goes back and forth, across windows and across a worker restart', async () => {
   const chrome = fakeChrome([
     { id: 1, url: 'https://a.com/', active: true },
@@ -155,6 +186,7 @@ test('“Switch to last used tab” goes back and forth, across windows and acro
   await chrome.windows.update(2, { focused: true }); // …then window 2, whose tab 3 is in front.
 
   // Chrome stops the idle worker; the shortcut starts a new one, which has only what was stored.
+  await settle(); // The stopped worker's timers die with it; here they're let run out first.
   dropListeners();
   const { handleCommand } = startWorker(chrome.api);
   assert.deepEqual(await handleCommand(SWITCH_LAST, tabOf(chrome, 3)), [2]);
