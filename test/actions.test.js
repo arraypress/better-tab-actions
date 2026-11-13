@@ -467,20 +467,19 @@ const outline = (entries, indent = '') => entries.flatMap((entry) => [
 /** A window with tabs to group and a workspace saved: everything usable. */
 const BUSY = { ...NO_STATE, closedCount: 1, ungroupedTabs: 3, workspaces: [{ id: 'w1', name: 'Work' }] };
 
-test('menuEntries: a short first level of the everyday actions, then “Close” and “Groups and workspaces” as submenus; no separators anywhere', () => {
+test('menuEntries: every closing action together at the first level, “Close tabs to the left” first; one submenu, for what’s saved; no separators', () => {
   assert.deepEqual(outline(menuEntries(WORDS, DEFAULTS, BUSY)), [
+    'Close tabs to the left',
     'Close tabs from this site',
     'Close other tabs from this site',
     'Close duplicate tabs',
+    'Close tabs not used in 7 days',
     'Reopen 1 closed tab',
     'Sort tabs by site',
     'Mute other tabs',
     'Open workspace ›',
     '  Work',
     '  Manage workspaces',
-    'Close ›',
-    '  Close tabs not used in 7 days',
-    '  Close tabs to the left',
     'Groups and workspaces ›',
     '  Save this window as a group',
     '  Close window and keep as group',
@@ -488,33 +487,46 @@ test('menuEntries: a short first level of the everyday actions, then “Close”
     '  Save this window as workspace',
   ]);
   const entries = menuEntries(WORDS, DEFAULTS, BUSY);
-  assert.equal(entries.length, 9, 'nine rows at the first level, not thirteen');
   assert.ok(!JSON.stringify(entries).includes('separator'));
-  assert.deepEqual(entries.slice(-2).map((entry) => entry.id), GROUPS.map((group) => group.id));
-  assert.ok(GROUPS.every((group) => !ACTIONS.some((a) => a.id === group.id)), 'a submenu’s id is no action’s');
+  // One kind of action, one place: nothing that closes tabs is inside a submenu, and there's no “Close” submenu.
+  assert.deepEqual(GROUPS.map((group) => group.id), ['menu-saved']);
+  const closing = ACTIONS.filter((a) => a.id.startsWith('close-') && a.id !== 'close-window-keep-group');
+  assert.deepEqual(closing.map((a) => a.group), [undefined, undefined, undefined, undefined, undefined]);
+  assert.ok(!ACTIONS.some((a) => a.id === 'menu-saved'), 'the submenu’s id is no action’s');
 });
 
 test('ACTIONS: in the order the menu reads, every id as before the menu was regrouped', () => {
   assert.deepEqual(ACTIONS.map((a) => `${a.id}${a.group ? ` [${a.group}]` : ''}`), [
-    'close-site-tabs', 'close-other-site-tabs', 'close-duplicate-tabs', 'reopen-closed-tabs', 'sort-tabs-by-site', 'mute-other-tabs',
-    'open-workspace',
-    'close-inactive-tabs [close]', 'close-tabs-to-left [close]',
+    'close-tabs-to-left', 'close-site-tabs', 'close-other-site-tabs', 'close-duplicate-tabs', 'close-inactive-tabs',
+    'reopen-closed-tabs', 'sort-tabs-by-site', 'mute-other-tabs', 'open-workspace',
     'save-window-as-group [saved]', 'close-window-keep-group [saved]', 'save-workspace [saved]', 'save-window-workspace [saved]',
   ]);
 });
 
-test('menuEntries: a submenu left with one visible action shows that action at the first level instead; with none, it isn’t there', () => {
-  const one = normalizeSettings({ hiddenActions: ['close-tabs-to-left', 'save-window-as-group', 'close-window-keep-group', 'save-workspace'] });
-  assert.deepEqual(outline(menuEntries(WORDS, one, BUSY)).slice(-2), ['Close tabs not used in 7 days', 'Save this window as workspace']);
-  const none = normalizeSettings({ hiddenActions: ['close-inactive-tabs', 'close-tabs-to-left'] });
-  assert.deepEqual(menuEntries(WORDS, none, BUSY).map((entry) => entry.id).slice(-2), ['open-workspace', 'menu-saved']);
+test('menuEntries: “Open workspace” is there only while there’s a workspace to open; “Reopen closed tabs” stays, greyed out, when nothing is closed', () => {
+  const none = menuEntries(WORDS, DEFAULTS, { ...NO_STATE, ungroupedTabs: 3 });
+  assert.deepEqual(outline(none).slice(5, 9), ['Reopen closed tabs (greyed out)', 'Sort tabs by site', 'Mute other tabs', 'Groups and workspaces ›']);
+  assert.equal(none.some((entry) => entry.id === 'open-workspace'), false);
+  assert.equal(none.length, 9);
+  const one = menuEntries(WORDS, DEFAULTS, { ...NO_STATE, workspaces: [{ id: 'w1', name: 'Work' }] });
+  assert.deepEqual(one.map((entry) => entry.id).slice(-2), ['open-workspace', 'menu-saved'], 'last but one');
+  assert.equal(one.length, 10);
+  // Hidden in the settings, it's gone whatever is saved.
+  assert.equal(menuEntries(WORDS, normalizeSettings({ hiddenActions: ['open-workspace'] }), BUSY).some((entry) => entry.id === 'open-workspace'), false);
 });
 
-test('menuEntries: a submenu with nothing usable just now isn’t shown; with one usable action it is, the rest greyed out', () => {
+test('menuEntries: the submenu left with one visible action shows that action at the first level instead; with none, it isn’t there', () => {
+  const one = normalizeSettings({ hiddenActions: ['save-window-as-group', 'close-window-keep-group', 'save-workspace'] });
+  assert.deepEqual(outline(menuEntries(WORDS, one, BUSY)).slice(-4), ['Open workspace ›', '  Work', '  Manage workspaces', 'Save this window as workspace']);
+  const none = normalizeSettings({ hiddenActions: ['save-window-as-group', 'close-window-keep-group', 'save-workspace', 'save-window-workspace'] });
+  assert.deepEqual(menuEntries(WORDS, none, BUSY).map((entry) => entry.id).slice(-2), ['mute-other-tabs', 'open-workspace']);
+});
+
+test('menuEntries: the submenu with nothing usable just now isn’t shown; with one usable action it is, the rest greyed out', () => {
   // An incognito window with only pinned tabs, and the workspaces full: nothing to save anywhere.
   const full = Array.from({ length: 40 }, (_, i) => ({ id: `w${i}`, name: `W${i}` }));
   const nothing = { ...NO_STATE, incognito: true, workspaces: full };
-  assert.deepEqual(menuEntries(WORDS, DEFAULTS, nothing).map((entry) => entry.id).slice(-2), ['open-workspace', 'menu-close']);
+  assert.deepEqual(menuEntries(WORDS, DEFAULTS, nothing).map((entry) => entry.id).slice(-2), ['mute-other-tabs', 'open-workspace']);
   // An ordinary window with only pinned tabs: the workspace items work, the group ones don’t.
   assert.deepEqual(outline(menuEntries(WORDS, DEFAULTS, NO_STATE)).slice(-5), [
     'Groups and workspaces ›',
@@ -539,8 +551,8 @@ test('menuEntries: hidden actions are left out; all hidden, there’s no menu', 
     'close-site-tabs',
     'close-other-site-tabs',
     'close-duplicate-tabs',
-    'reopen-closed-tabs',
     'close-inactive-tabs',
+    'reopen-closed-tabs',
   ]);
   assert.deepEqual(menuEntries(WORDS, normalizeSettings({ hiddenActions: ACTIONS.map((a) => a.id) })), []);
 });
@@ -566,9 +578,9 @@ test('manifest: every action has a matching command described by the action’s 
   assert.deepEqual(
     [SWITCH_LAST_MESSAGE, ...ACTIONS.map((a) => a.message)].map((key) => WORDS.t(key)),
     [
-      'Switch to last used tab', 'Close tabs from this site', 'Close other tabs from this site', 'Close duplicate tabs',
-      'Reopen closed tabs', 'Sort tabs by site', 'Mute or unmute other tabs', 'Open last workspace',
-      'Close inactive tabs', 'Close tabs to the left',
+      'Switch to last used tab', 'Close tabs to the left', 'Close tabs from this site', 'Close other tabs from this site',
+      'Close duplicate tabs', 'Close inactive tabs', 'Reopen closed tabs', 'Sort tabs by site', 'Mute or unmute other tabs',
+      'Open last workspace',
       'Save this window as a group', 'Close window and keep as group', 'Save windows as workspace', 'Save this window as workspace',
     ],
     'as Chrome’s Keyboard shortcuts page lists them',

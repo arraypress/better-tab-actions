@@ -47,11 +47,13 @@ First version.
   language on Windows.)
 - “Close duplicate tabs” across all windows never closes the tab in front in another window: it’s
   kept, and its copies go.
-- **A shorter menu.** The first level holds the everyday actions and “Open workspace”; the rest
-  are in two submenus, “Close” and “Groups and workspaces” (a submenu with one action left shows
-  it at the first level; one with nothing to use just then isn’t shown). No separators are sent:
-  Chrome draws none in a tab-menu submenu. Every action keeps its id, shortcut and setting, and
-  the settings page lists them the same way.
+- **A menu that reads at a glance.** Every closing action is together at the first level, “Close
+  tabs to the left” first (beside Chrome’s own “Close tabs to the right”), then Reopen closed
+  tabs, Sort tabs by site and Mute other tabs; “Open workspace” appears once a workspace is
+  saved; the four saving actions are in one submenu, “Groups and workspaces” (with one action
+  left it shows at the first level; with nothing to use just then it isn’t shown). No separators
+  are sent: Chrome draws none in a tab-menu submenu. Every action keeps its id, shortcut and
+  setting, and the settings page lists them the same way.
 - Choose which actions show in the menu.
 - Incognito tabs an action closes aren’t kept for “Reopen closed tabs”, as Chrome keeps no closed
   tabs for incognito windows.

@@ -62,10 +62,10 @@ test('menuItems: the submenu first, each parent before its children, at most thr
   }
   assert.deepEqual(items.filter((item) => item.parentId === 'open-workspace').map((item) => item.title), ['Work', 'Manage workspaces']);
   assert.deepEqual(items.filter((item) => item.parentId === PARENT_ID).map((item) => item.id), [
-    'close-site-tabs', 'close-other-site-tabs', 'close-duplicate-tabs', 'reopen-closed-tabs', 'sort-tabs-by-site', 'mute-other-tabs',
-    'open-workspace', 'menu-close', 'menu-saved',
+    'close-tabs-to-left', 'close-site-tabs', 'close-other-site-tabs', 'close-duplicate-tabs', 'close-inactive-tabs',
+    'reopen-closed-tabs', 'sort-tabs-by-site', 'mute-other-tabs', 'open-workspace', 'menu-saved',
   ]);
-  assert.deepEqual(items.filter((item) => item.parentId === 'menu-close').map((item) => item.id), ['close-inactive-tabs', 'close-tabs-to-left']);
+  assert.deepEqual(items.filter((item) => item.parentId === 'menu-saved').map((item) => item.id), ['save-window-as-group', 'close-window-keep-group', 'save-workspace', 'save-window-workspace']);
   assert.ok(items.every((item) => item.type === undefined), 'Chrome draws no separator in a tab-menu submenu: none is sent');
   // More tab actions › a submenu › its items: nothing deeper.
   assert.ok(items.every((item) => [undefined, PARENT_ID].includes(/** @type {string | undefined} */ (items.find((parent) => parent.id === item.parentId)?.parentId))));
@@ -83,9 +83,31 @@ test('install and browser start in one run (a Chrome update): one whole menu, no
   assert.deepEqual(chrome.contextMenus.errors, [], 'no “Cannot create item with duplicate id”');
   assert.deepEqual(
     chrome.contextMenus.items.map((item) => item.id).sort(),
-    [PARENT_ID, 'menu-close', 'menu-saved', ...ACTIONS.map((action) => action.id)].sort(),
+    // Nothing is saved yet, so there's no “Open workspace”.
+    [PARENT_ID, 'menu-saved', ...ACTIONS.map((action) => action.id).filter((id) => id !== 'open-workspace')].sort(),
   );
   assert.equal(chrome.contextMenus.shows('reopen-closed-tabs'), 'Reopen closed tabs (greyed out)');
+});
+
+test('an update from the build with a “Close” submenu leaves nothing of it in Chrome’s menu: the first build takes the old items away', async () => {
+  const chrome = fakeChrome([{ id: 1, url: 'https://a.com/', active: true }], { windows: { 1: { focused: true } } });
+  // What Chrome was left holding by the previous version (it keeps menu items across updates).
+  const old = [
+    { id: PARENT_ID, title: 'More tab actions' }, { id: 'close-site-tabs', parentId: PARENT_ID, title: 'Close tabs from this site' },
+    { id: 'open-workspace', parentId: PARENT_ID, title: 'Open workspace', enabled: false },
+    { id: 'menu-close', parentId: PARENT_ID, title: 'Close' }, { id: 'close-tabs-to-left', parentId: 'menu-close', title: 'Close tabs to the left' },
+    { id: 'more-tab-actions-separator-6', parentId: PARENT_ID, type: /** @type {const} */ ('separator') },
+  ];
+  for (const item of old) await new Promise((resolve) => { chrome.contextMenus.create({ ...item, contexts: ['tab'] }, () => resolve(undefined)); });
+  assert.equal(chrome.contextMenus.shows('menu-close'), 'Close');
+
+  startWorker(chrome.api);
+  await chrome.runtime.onInstalled.fire({ reason: 'update' });
+  assert.deepEqual(chrome.contextMenus.errors, []);
+  const ids = chrome.contextMenus.items.map((item) => String(item.id));
+  assert.deepEqual(ids.filter((id) => id === 'menu-close' || id.includes('separator') || id === 'open-workspace'), []);
+  assert.equal(chrome.contextMenus.items.find((item) => item.id === 'close-tabs-to-left')?.parentId, PARENT_ID);
+  assert.equal(new Set(ids).size, ids.length);
 });
 
 test('the menu follows the settings: hidden actions go, every action hidden leaves no menu, the days show in the label', async () => {
@@ -165,9 +187,9 @@ test('a submenu with nothing usable goes from the menu, and comes back, as the f
 
   await chrome.windows.update(2, { focused: true });
   // (Waited for to its last item: a build takes the old menu away first.)
-  await until(() => chrome.contextMenus.shows('menu-saved') === undefined && chrome.contextMenus.shows('close-tabs-to-left') !== undefined, 'the submenu to go');
+  await until(() => chrome.contextMenus.shows('menu-saved') === undefined && chrome.contextMenus.shows('manage-workspaces') !== undefined, 'the submenu to go');
   assert.equal(chrome.contextMenus.shows('save-window-as-group'), undefined);
-  assert.equal(chrome.contextMenus.shows('menu-close'), 'Close');
+  assert.equal(chrome.contextMenus.shows('open-workspace'), 'Open workspace', 'the first level is as it was');
   assert.ok(chrome.contextMenus.removals > removals, 'built whole');
   await chrome.windows.update(1, { focused: true });
   await until(() => chrome.contextMenus.shows('menu-saved') === 'Groups and workspaces' && chrome.contextMenus.shows('save-window-workspace') !== undefined, 'the submenu to come back');
@@ -207,7 +229,7 @@ test('a shortcut runs its action on the tab Chrome names; an unknown command doe
 
 test('workspaces from the menu: saving lists it under “Open workspace”, its item opens it, “Manage workspaces” opens the settings page', async () => {
   const { chrome, handleMenuClick } = await installed();
-  assert.equal(chrome.contextMenus.shows('open-workspace'), 'Open workspace (greyed out)');
+  assert.equal(chrome.contextMenus.shows('open-workspace'), undefined, 'not in the menu while nothing is saved');
   await handleMenuClick({ menuItemId: 'save-workspace' }, tabOf(chrome, 1));
   const [workspace] = await loadWorkspaces(chrome.api.storage.local);
   await until(() => chrome.contextMenus.shows(`open-workspace:${workspace.id}`) === workspace.name, 'the submenu item');

@@ -171,12 +171,11 @@ await runChecks(runner, async () => {
     await page.close();
   });
 
-  await check('the Menu card lists the actions as the menu reads: the everyday ones, then “Close” and “Groups and workspaces” over theirs', async () => {
+  await check('the Menu card lists the actions as the menu reads: the closing ones together, then the rest, then “Groups and workspaces” over its four', async () => {
     const page = await open();
     assert.deepEqual(await page.locator('#menu-items > *').evaluateAll((rows) => rows.map((row) => `${row.matches('label') ? '' : '# '}${/** @type {HTMLElement} */ (row).innerText.trim()}`)), [
-      'Close tabs from this site', 'Close other tabs from this site', 'Close duplicate tabs', 'Reopen closed tabs', 'Sort tabs by site', 'Mute other tabs',
-      'Open workspace',
-      '# Close', 'Close tabs not used in 30 days', 'Close tabs to the left',
+      'Close tabs to the left', 'Close tabs from this site', 'Close other tabs from this site', 'Close duplicate tabs', 'Close tabs not used in 30 days',
+      'Reopen closed tabs', 'Sort tabs by site', 'Mute other tabs', 'Open workspace',
       '# Groups and workspaces', 'Save this window as a group', 'Close window and keep as group', 'Save windows as workspace', 'Save this window as workspace',
     ]);
     await page.close();
@@ -186,7 +185,7 @@ await runChecks(runner, async () => {
     const page = await open();
     const days = page.locator('#inactiveDays');
     /** The number field and its unit, and the Menu card's row for the inactive action. */
-    const shown = async () => [`${await days.inputValue()} ${await page.locator('#days-unit').innerText()}`, await page.locator('#menu-items label').nth(7).innerText()];
+    const shown = async () => [`${await days.inputValue()} ${await page.locator('#days-unit').innerText()}`, await page.locator('#menu-items label').nth(4).innerText()];
     assert.deepEqual(await shown(), ['30 days', 'Close tabs not used in 30 days']);
     await days.fill('1');
     await days.press('Enter');

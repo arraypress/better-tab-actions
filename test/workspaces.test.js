@@ -476,11 +476,10 @@ test('save actions: greyed out and do nothing once MAX_WORKSPACES are kept', asy
   assert.equal(open?.children?.at(-1)?.id, MANAGE_WORKSPACES);
 });
 
-test('menu: “Open workspace” is greyed out with no submenu while nothing is saved; save in incognito is greyed out', async () => {
+test('menu: “Open workspace” isn’t there while nothing is saved; save in incognito is greyed out', async () => {
   const b = twoWindows();
   const entries = menuEntries(WORDS, DEFAULTS, menuState(await b.tabs.query({}), 0, EXTENSION_ID, 3, []));
-  const open = entryOf(entries, 'open-workspace');
-  assert.deepEqual([open?.enabled, open?.children], [false, undefined]);
+  assert.equal(entryOf(entries, 'open-workspace'), undefined);
   assert.equal(entryOf(entries, 'save-window-workspace')?.enabled, false);
   assert.equal(entryOf(entries, 'save-workspace')?.enabled, true);
 });

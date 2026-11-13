@@ -109,16 +109,21 @@ events) updates only the items whose title or greyed-out state changed: "Reopen 
 `contexts: ['tab']` puts the items on the tab strip's menu; the manifest's `minimum_chrome_version`
 is 150.
 
-- **Structure** (`shared/actions.js` `menuEntries`, `GROUPS`; David saw thirteen items in one unbroken list in
-  Chrome 157, 14 Nov 2026). First level: Close tabs from this site, Close other tabs from this site, Close
-  duplicate tabs, Reopen closed tabs, Sort tabs by site, Mute other tabs, Open workspace ›, then the submenus
-  **Close ›** (not used in N days, to the left) and **Groups and workspaces ›** (the two group and two save
-  actions). An action's `group` says which submenu; `ACTIONS` is in the order the menu reads, and the settings
-  page's Menu card lists it the same way, each submenu's name over its actions. A submenu with one visible
-  action shows that action at the first level; with none visible, or none usable just now (all greyed out), it
-  isn't there. "Open workspace ›" stays at the first level: inside "Groups and workspaces" its workspaces would
-  be four menus deep. Ids, commands and `hiddenActions` are unchanged; the submenus' own ids are `menu-close`
-  and `menu-saved`.
+- **Structure** (`shared/actions.js` `menuEntries`, `GROUPS`; David, 14 Nov 2026: thirteen items in one
+  unbroken list were too many, and then a "Close ›" submenu split the closing actions over two places, which
+  confused: **one kind of action lives in one place**). First level, in order: Close tabs to the left (first, as
+  it pairs with Chrome's own "Close tabs to the right" just under the menu), Close tabs from this site, Close
+  other tabs from this site, Close duplicate tabs, Close tabs not used in N days, Reopen closed tabs, Sort tabs
+  by site, Mute other tabs, Open workspace ›, then the one submenu **Groups and workspaces ›** (the two group
+  and two save actions; an action's `group`). `ACTIONS` is in the order the menu reads, the manifest's commands
+  and the settings page's Menu card follow it, the submenu's name over its actions. A submenu with one visible
+  action shows that action at the first level; with none visible, or none usable just now, it isn't there.
+- **Hidden or greyed out.** "Open workspace" isn't shown while no workspace is saved (`hideUnusable`): that
+  state changes only when a workspace is saved or the last one deleted, which builds the menu anyway. "Reopen
+  closed tabs" stays and greys out: it would come and go after every close. No other first-level row is ever
+  unusable. Ids, commands and `hiddenActions` are unchanged; the submenu's own id is `menu-saved`. The earlier
+  `menu-close` item, like the separators, goes with the first whole build after an update
+  (`runtime.onInstalled` → `removeAll`; `test/worker.test.js`).
 - **A submenu coming or going needs a whole build** (items can't be added one at a time in place), so
   `refresh()` compares the items' ids with what the menu was last built with (`menuBuilt` in
   `chrome.storage.session`, as a new run of the worker has no memory of it) and builds when they differ.

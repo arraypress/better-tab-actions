@@ -58,6 +58,8 @@ import { loadWorkspaces, MAX_WORKSPACES, MENU_WORKSPACES, openWorkspace, saveWor
 /**
  * A menu action. `message` is its name's key in `_locales` (the same message is its shortcut's
  * description in manifest.json); `menuTitle` overrides it in the menu, `enabled` can grey it out,
+ * `hideUnusable` leaves it out of the menu instead while it can't be used (only for a state that
+ * rarely changes: a row that came and went all the time would make the menu jump about),
  * and `children` makes it a submenu. An action either has a `plan`, or is `reopen: true` and
  * reopens the last closed batch, or has a `workspace` job: save every window, save the clicked
  * one, or open a workspace.
@@ -68,6 +70,7 @@ import { loadWorkspaces, MAX_WORKSPACES, MENU_WORKSPACES, openWorkspace, saveWor
  *   group?: ActionGroup,
  *   menuTitle?: (words: Words, settings: Settings, state: MenuState) => string,
  *   enabled?: (state: MenuState) => boolean,
+ *   hideUnusable?: boolean,
  *   children?: (state: MenuState, words: Words) => MenuEntry[],
  * } & (
  *   | {plan: (target: Tab, tabs: Tab[], ctx: PlanContext) => Plan, reopen?: undefined, workspace?: undefined}
@@ -77,10 +80,10 @@ import { loadWorkspaces, MAX_WORKSPACES, MENU_WORKSPACES, openWorkspace, saveWor
  */
 
 /**
- * The submenu an action sits in when it isn't an everyday one: more ways to close tabs, or
- * saving windows as groups and workspaces.
+ * The submenu an action sits in when it isn't at the first level: saving windows as groups and
+ * workspaces. (Every closing action is at the first level, together: one kind of action, one place.)
  *
- * @typedef {'close' | 'saved'} ActionGroup
+ * @typedef {'saved'} ActionGroup
  */
 
 /**
@@ -388,17 +391,29 @@ function sortMoves(target, tabs) {
  * @type {readonly {group: ActionGroup, id: string, message: string}[]}
  */
 export const GROUPS = Object.freeze([
-  { group: 'close', id: 'menu-close', message: 'menuGroupClose' },
   { group: 'saved', id: 'menu-saved', message: 'menuGroupSaved' },
 ]);
 
 /**
- * The actions, in the order the menu reads: the everyday ones at the first level, then each
- * submenu's ({@link GROUPS}), which is also the order the settings page lists them in.
+ * The actions, in the order the menu reads: the closing ones together ("Close tabs to the left"
+ * first, beside Chrome's own "Close tabs to the right" just under the menu), the rest of the
+ * first level, then each submenu's ({@link GROUPS}), which is also the order the settings page lists them in.
  *
  * @type {readonly Action[]}
  */
 export const ACTIONS = [
+  {
+    // Same window only, like Chrome's own "Close tabs to the right".
+    id: 'close-tabs-to-left',
+    message: 'actionCloseTabsToLeft',
+    plan: (target, tabs, { settings }) =>
+      close(
+        tabs.filter(
+          (tab) =>
+            closable(tab, settings) && tab.windowId === target.windowId && tab.index < target.index,
+        ),
+      ),
+  },
   {
     id: 'close-site-tabs',
     message: 'actionCloseSiteTabs',
@@ -414,6 +429,14 @@ export const ACTIONS = [
     id: 'close-duplicate-tabs',
     message: 'actionCloseDuplicateTabs',
     plan: (target, tabs, { settings }) => close(duplicates(target, tabs, settings)),
+  },
+  {
+    // Skips active tabs, playing tabs, and tabs with no last-used time.
+    id: 'close-inactive-tabs',
+    message: 'actionCloseInactiveTabs',
+    menuTitle: (words, { inactiveDays }) => counted(inactiveDays, 'menuCloseInactiveOne', 'menuCloseInactive', words),
+    plan: (target, tabs, { now, settings }) =>
+      close(inScope(target, tabs, settings).filter((tab) => unused(tab, settings, now, settings.inactiveDays * DAY_MS))),
   },
   {
     id: 'reopen-closed-tabs',
@@ -454,6 +477,8 @@ export const ACTIONS = [
     message: 'actionOpenWorkspace',
     menuTitle: ({ t }) => t('menuOpenWorkspace'),
     enabled: ({ workspaces }) => workspaces.length > 0,
+    // With no workspace there's nothing to open: the row isn't shown, rather than sit greyed out.
+    hideUnusable: true,
     children: ({ workspaces }, { t }) => workspaces.length
       ? [
         ...workspaces.slice(0, MENU_WORKSPACES).map(({ id, name }) => ({ id: `${WORKSPACE_ITEM_PREFIX}${id}`, title: name, enabled: true })),
@@ -461,28 +486,6 @@ export const ACTIONS = [
       ]
       : [],
     workspace: 'open',
-  },
-  {
-    // Skips active tabs, playing tabs, and tabs with no last-used time.
-    id: 'close-inactive-tabs',
-    message: 'actionCloseInactiveTabs',
-    menuTitle: (words, { inactiveDays }) => counted(inactiveDays, 'menuCloseInactiveOne', 'menuCloseInactive', words),
-    group: 'close',
-    plan: (target, tabs, { now, settings }) =>
-      close(inScope(target, tabs, settings).filter((tab) => unused(tab, settings, now, settings.inactiveDays * DAY_MS))),
-  },
-  {
-    // Same window only, like Chrome's own "Close tabs to the right".
-    id: 'close-tabs-to-left',
-    message: 'actionCloseTabsToLeft',
-    group: 'close',
-    plan: (target, tabs, { settings }) =>
-      close(
-        tabs.filter(
-          (tab) =>
-            closable(tab, settings) && tab.windowId === target.windowId && tab.index < target.index,
-        ),
-      ),
   },
   {
     // Chrome saves every tab group it shows, including ones extensions make, so the new group
@@ -548,7 +551,8 @@ export function menuTitle(action, words, settings = DEFAULTS, state = NO_STATE) 
 }
 
 /**
- * The "More tab actions" submenu's contents: the visible everyday actions, then each of
+ * The "More tab actions" submenu's contents: the visible first-level actions (those that hide
+ * while they can't be used left out: "Open workspace" with no workspace), then each of
  * {@link GROUPS} as a submenu of its visible actions. A group with one visible action shows that
  * action at the first level instead (a submenu of one is a click wasted); a group with none
  * visible, or none that can be used just now, isn't shown at all.
@@ -564,16 +568,14 @@ export function menuEntries(words, settings = DEFAULTS, state = NO_STATE) {
    * @param {ActionGroup} [group] - A group; the everyday actions when left out.
    * @returns {MenuEntry[]} Its visible actions' entries, in order.
    */
-  const entriesOf = (group) => ACTIONS.filter((action) => action.group === group && !hidden.has(action.id)).map((action) => {
+  const entriesOf = (group) => ACTIONS.filter((action) => action.group === group && !hidden.has(action.id)).flatMap((action) => {
+    const enabled = action.enabled ? action.enabled(state) : true;
+    if (action.hideUnusable && !enabled) return [];
     /** @type {MenuEntry} */
-    const entry = {
-      id: action.id,
-      title: menuTitle(action, words, settings, state),
-      enabled: action.enabled ? action.enabled(state) : true,
-    };
+    const entry = { id: action.id, title: menuTitle(action, words, settings, state), enabled };
     const children = action.children?.(state, words) ?? [];
     if (children.length) entry.children = children;
-    return entry;
+    return [entry];
   });
   const entries = entriesOf();
   for (const { group, id, message } of GROUPS) {

@@ -326,7 +326,7 @@ shots.push(menuShot({
   tabs: trailTabs(1),
   url: 'trailhead.example/bierstadt-lake-loop', urlHost: 'trailhead.example',
   page: content.bierstadt,
-  hover: defaultEntries[0]?.title ?? '',
+  hover: titleOf(defaultEntries, 'close-site-tabs'),
   entryList: defaultEntries,
   clickTab: 1,
 }));

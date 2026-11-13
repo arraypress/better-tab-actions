@@ -90,9 +90,6 @@
   "menuManageWorkspaces": {
     "message": "Manage workspaces"
   },
-  "menuGroupClose": {
-    "message": "Close"
-  },
   "menuGroupSaved": {
     "message": "Groups and workspaces"
   },
